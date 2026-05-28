@@ -73,15 +73,38 @@ function defaultRange() {
   return { start: fmt(start), end: fmt(now) };
 }
 
+/** Normaliza string removendo acentos e fazendo upper-case (mesmo padrao do Streamlit). */
+function normStatus(s: string | null | undefined): string {
+  if (!s) return '';
+  return String(s)
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/** Status que contam como "Perdido/Descarte" (replicado do Streamlit Infratecnica). */
+const STATUS_PERDIDOS = new Set([
+  'VENDA PERDIDA',
+  'VENDA PERDIDA B.B',
+  'SEM INTERESSE ML',
+  'DESISTENCIA PC',
+]);
+
+/**
+ * Agrega por dimensao em rows de f_funil, contando `id_oportunidade` distintos
+ * (mesmo comportamento do `_agg_dim` do Streamlit: `nunique(id_oportunidade)`).
+ */
 function aggDim(rows: RowFunil[], dim: keyof RowFunil, topN = 10): Array<{ key: string; value: number }> {
-  const m = new Map<string, number>();
+  const buckets = new Map<string, Set<number>>();
   for (const r of rows) {
     const k = String(r[dim] ?? '').trim();
     if (!k || ['nan', 'none', '0', '0.0', 'nat', '<na>', 'null'].includes(k.toLowerCase())) continue;
-    m.set(k, (m.get(k) ?? 0) + 1);
+    if (!buckets.has(k)) buckets.set(k, new Set());
+    buckets.get(k)!.add(r.id_oportunidade);
   }
-  return Array.from(m.entries())
-    .map(([key, value]) => ({ key, value }))
+  return Array.from(buckets.entries())
+    .map(([key, ids]) => ({ key, value: ids.size }))
     .sort((a, b) => b.value - a.value)
     .slice(0, topN);
 }
@@ -181,33 +204,29 @@ export default function LeadFunilInvestimento() {
   }, [investimento, period, empSel]);
 
   const investimentoTotal = investimentoFiltrado.reduce((s, r) => s + (Number(r.valor_investimento) || 0), 0);
-  const leadsGerados = escopoFiltradoEtapa.length;
+
+  // Regra Infratecnica (replicada do Streamlit dashboard.py render_lead_funil_investimento):
+  // - Leads Gerados = TOTAL de oportunidades no periodo (mesma base da Visao Geral),
+  //   independente do filtro de etapa do funil.
+  // - Vendas = oportunidades cujo status_oportunidade == 'VENDA GANHA'.
+  // - Perdidos = oportunidades com status no conjunto STATUS_PERDIDOS.
+  const leadsGerados = opvsFiltrados.length;
   const cplMedio = leadsGerados ? investimentoTotal / leadsGerados : 0;
-  // Regra Mundo Apto: venda = oportunidade onde TANTO data_distribuicao QUANTO
-  // data_venda_contabilizada estao no periodo selecionado.
-  // (opvsFiltrados ja' garante data_distribuicao no periodo; aqui completamos
-  // com data_venda_contabilizada no mesmo periodo.)
-  const totalVendas = useMemo(() => {
-    const ini = new Date(period.start);
-    const fim = new Date(period.end + 'T23:59:59');
-    return opvsFiltrados.filter((o) => {
-      if (!o.data_venda_contabilizada) return false;
-      const dc = new Date(o.data_venda_contabilizada);
-      if (dc < ini || dc > fim) return false;
-      if (!opvIds.has(o.id_oportunidade)) return false;
-      if (etapaSel.length && !(CASE_MAP_FASE[6] && etapaSel.includes(NOME_FASE[6]))) return false;
-      return true;
-    }).length;
-  }, [opvsFiltrados, opvIds, etapaSel, period]);
-  const totalPerdidos = opvsFiltrados.filter((o) => {
-    const u = (o.status_oportunidade || '').toUpperCase();
-    return u.includes('PERDIDO') || u.includes('DESCARTE');
-  }).length;
+  const totalVendas = useMemo(
+    () => opvsFiltrados.filter((o) => normStatus(o.status_oportunidade) === 'VENDA GANHA').length,
+    [opvsFiltrados],
+  );
+  const totalPerdidos = useMemo(
+    () => opvsFiltrados.filter((o) => STATUS_PERDIDOS.has(normStatus(o.status_oportunidade))).length,
+    [opvsFiltrados],
+  );
   const cac = totalVendas ? investimentoTotal / totalVendas : 0;
   const pctConv = leadsGerados ? (totalVendas / leadsGerados) * 100 : 0;
   const pctPerdidos = leadsGerados ? (totalPerdidos / leadsGerados) * 100 : 0;
 
-  // Funil: contagem de OPVs únicas por etapa (com base em id_etapa_atual mapeado)
+  // Funil: contagem de OPVs unicas por etapa (replica `agg` do Streamlit).
+  // - Stage 1 (Leads) e substituida pelo total de OPVs do periodo (leadsGerados).
+  // - Etapa 7 (Perdido/Descarte) e excluida do funil.
   const funnelData = useMemo(() => {
     const cont: Record<number, Set<number>> = {};
     for (const f of funilNoEscopo) {
@@ -216,35 +235,45 @@ export default function LeadFunilInvestimento() {
       if (!cont[fase]) cont[fase] = new Set();
       cont[fase].add(f.id_oportunidade);
     }
-    // Stage 1 = total de leads gerados (replicar v001)
-    return ETAPAS_FUNIL.map((fase) => {
-      const qtd = fase === 1 ? leadsGerados : (cont[fase]?.size ?? 0);
-      const pct = leadsGerados ? Math.round((qtd / leadsGerados) * 100) : 0;
-      return { name: NOME_FASE[fase], value: qtd, pct: `${pct}%` };
-    });
+    return ETAPAS_FUNIL
+      .filter((fase) => fase !== 7) // exclui Perdido/Descarte (mesmo que o Streamlit)
+      .map((fase) => {
+        const qtd = fase === 1 ? leadsGerados : (cont[fase]?.size ?? 0);
+        const pct = leadsGerados ? Math.round((qtd / leadsGerados) * 100) : 0;
+        return { name: NOME_FASE[fase], value: qtd, pct: `${pct}%` };
+      });
   }, [funilNoEscopo, leadsGerados]);
 
-  // Tabela origem (por mídia): cpl, opvs, investimento
+  // Tabela origem (por midia): conta OPVs distintos em f_funil (sem filtro de etapa,
+  // como o Streamlit faz) e soma o investimento por midia. CPL = investimento / opvs.
   const tabelaOrigem = useMemo(() => {
     const inv = new Map<string, number>();
-    for (const r of investimentoFiltrado) inv.set(r.nome_midia || '—', (inv.get(r.nome_midia || '—') ?? 0) + (Number(r.valor_investimento) || 0));
-    const opvCount = new Map<string, number>();
-    for (const f of escopoFiltradoEtapa) opvCount.set(f.nome_midia || '—', (opvCount.get(f.nome_midia || '—') ?? 0) + 1);
-    const keys = new Set<string>([...Array.from(inv.keys()), ...Array.from(opvCount.keys())]);
+    for (const r of investimentoFiltrado) {
+      const k = (r.nome_midia || '—').trim() || '—';
+      inv.set(k, (inv.get(k) ?? 0) + (Number(r.valor_investimento) || 0));
+    }
+    const opvBuckets = new Map<string, Set<number>>();
+    for (const f of funilNoEscopo) {
+      const k = (f.nome_midia || '—').trim() || '—';
+      if (!opvBuckets.has(k)) opvBuckets.set(k, new Set());
+      opvBuckets.get(k)!.add(f.id_oportunidade);
+    }
+    const keys = new Set<string>([...Array.from(inv.keys()), ...Array.from(opvBuckets.keys())]);
     const rows = Array.from(keys).map((midia) => {
       const investimento = inv.get(midia) ?? 0;
-      const opvs = opvCount.get(midia) ?? 0;
+      const opvs = opvBuckets.get(midia)?.size ?? 0;
       const cpl = opvs ? investimento / opvs : 0;
       return { midia, cpl, opvs, investimento };
     });
     return rows.sort((a, b) => b.investimento - a.investimento);
-  }, [investimentoFiltrado, escopoFiltradoEtapa]);
+  }, [investimentoFiltrado, funilNoEscopo]);
 
-  // 4 distribuições por dimensão
-  const porEquipe = useMemo(() => aggDim(escopoFiltradoEtapa, 'nome_equipe'), [escopoFiltradoEtapa]);
-  const porGerente = useMemo(() => aggDim(escopoFiltradoEtapa, 'nome_gerente'), [escopoFiltradoEtapa]);
-  const porCorretor = useMemo(() => aggDim(escopoFiltradoEtapa, 'nome_corretor'), [escopoFiltradoEtapa]);
-  const porEmpreendimento = useMemo(() => aggDim(escopoFiltradoEtapa, 'nome_empreendimento'), [escopoFiltradoEtapa]);
+  // 4 distribuicoes por dimensao -- mesma base do Streamlit (funilNoEscopo, sem
+  // filtro de etapa, contando id_oportunidade distintos).
+  const porEquipe = useMemo(() => aggDim(funilNoEscopo, 'nome_equipe'), [funilNoEscopo]);
+  const porGerente = useMemo(() => aggDim(funilNoEscopo, 'nome_gerente'), [funilNoEscopo]);
+  const porCorretor = useMemo(() => aggDim(funilNoEscopo, 'nome_corretor'), [funilNoEscopo]);
+  const porEmpreendimento = useMemo(() => aggDim(funilNoEscopo, 'nome_empreendimento'), [funilNoEscopo]);
 
   // Tabela detalhe: 1 linha por id_oportunidade
   const detalheRows = useMemo(() => {

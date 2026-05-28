@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download } from 'lucide-react';
@@ -56,7 +56,7 @@ function exportCsv<T extends object>(rows: T[], cols: Column<T>[], filename: str
         .join(';')
     );
   }
-  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['ï»¿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

@@ -41,8 +41,13 @@ export function fmtDataHora(v: string | Date | null | undefined): string {
 
 /**
  * Pivot: agrupa array de objetos por uma chave de dimensão e soma uma chave numérica.
+ *
+ * Nota: a constraint `T extends object` (em vez de `Record<string, unknown>`)
+ * e' mais permissiva e aceita interfaces TS comuns (sem index signature),
+ * que e' como as paginas declaram suas linhas. O `keyof T` mantem a
+ * verificacao de chaves validas.
  */
-export function groupBySum<T extends Record<string, unknown>>(
+export function groupBySum<T extends object>(
   rows: T[],
   dim: keyof T,
   metricFn: (r: T) => number,
@@ -65,7 +70,7 @@ export function groupBySum<T extends Record<string, unknown>>(
 /**
  * Conta linhas agrupadas por dimensão. Filtra valores vazios.
  */
-export function groupByCount<T extends Record<string, unknown>>(
+export function groupByCount<T extends object>(
   rows: T[],
   dim: keyof T,
   topN?: number

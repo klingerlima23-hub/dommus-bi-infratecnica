@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import {
@@ -146,7 +146,7 @@ export default function Donut({
             {showCenter && (
               <Label
                 position="center"
-                content={(props: { viewBox?: { cx?: number; cy?: number } }) => {
+                content={(props: any) => {
                   const vb = props.viewBox ?? {};
                   const cx = vb.cx ?? 0;
                   const cy = vb.cy ?? 0;

@@ -13,7 +13,7 @@ export interface Column<T> {
   width?: number;
 }
 
-interface Props<T extends Record<string, unknown>> {
+interface Props<T extends object> {
   rows: T[];
   columns: Column<T>[];
   emptyMessage?: string;
@@ -43,7 +43,7 @@ function formatCell(v: unknown, type: ColType = 'string'): string {
   }
 }
 
-function exportCsv<T extends Record<string, unknown>>(rows: T[], cols: Column<T>[], filename: string) {
+function exportCsv<T extends object>(rows: T[], cols: Column<T>[], filename: string) {
   const lines = [cols.map((c) => `"${c.label}"`).join(';')];
   for (const r of rows) {
     lines.push(
@@ -65,7 +65,7 @@ function exportCsv<T extends Record<string, unknown>>(rows: T[], cols: Column<T>
   URL.revokeObjectURL(url);
 }
 
-export default function DataTable<T extends Record<string, unknown>>({
+export default function DataTable<T extends object>({
   rows,
   columns,
   emptyMessage = 'Sem dados.',
@@ -79,8 +79,10 @@ export default function DataTable<T extends Record<string, unknown>>({
     if (!sortKey) return rows;
     const k = sortKey;
     return [...rows].sort((a, b) => {
-      const va = a[k];
-      const vb = b[k];
+      // Cast para Record<string, unknown> apenas para a leitura dinamica
+      // pela chave string (sortKey vem do click no header da coluna).
+      const va = (a as Record<string, unknown>)[k];
+      const vb = (b as Record<string, unknown>)[k];
       if (va === vb) return 0;
       if (va === null || va === undefined) return 1;
       if (vb === null || vb === undefined) return -1;

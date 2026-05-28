@@ -8,8 +8,12 @@ export const revalidate = 0;
  * Funil de Venda — 5 etapas baseadas em f_venda + f_historico_etapa_processo.
  *
  * Retorna 1 linha por processo, com flags booleanas indicando se o processo
- * ja passou pelas etapas-chave em algum momento (EXISTS contra f_historico_etapa_processo)
- * e flag de venda (mesma regra da Visao Atual: processo_unidade_id > 0 AND processo_data_venda).
+ * ja passou pelas etapas-chave em algum momento (EXISTS contra f_historico_etapa_processo).
+ *
+ * Venda contabilizada: usa a coluna `venda_contabilizado_em` da propria
+ * tabela f_venda (populada pelo ETL via tb_venda.contabilizado_em do CRM).
+ * E' o sinal real de venda contabilizada -- nao precisamos inferir por
+ * processo_unidade_id como o codigo legado tentava fazer.
  *
  * O collation utf8mb4_unicode_ci e case+accent-insensitive, entao os LIKE
  * abaixo casam variacoes como "INSTITUICAO" vs "INSTITUIÇÃO" e a digitacao
@@ -30,16 +34,9 @@ SELECT
   v.unidade_valor_liquido,
   v.processo_data_venda,
   v.processo_unidade_id,
+  v.venda_contabilizado_em,
   v.etapas_workflow_nome              AS etapa_atual,
-  CASE WHEN v.processo_unidade_id > 0 AND v.processo_data_venda IS NOT NULL THEN 1 ELSE 0 END AS is_venda,
-  -- Alias necessario pro front-end (_FunilVenda.tsx) que filtra a cohort
-  -- de "Venda" por venda_contabilizado_em. No modelo Infratecnica nao ha
-  -- coluna separada de contabilizacao; a data efetiva da venda e' a
-  -- propria processo_data_venda quando o processo tem unidade vinculada.
-  CASE WHEN v.processo_unidade_id > 0 AND v.processo_data_venda IS NOT NULL
-       THEN v.processo_data_venda
-       ELSE NULL
-  END AS venda_contabilizado_em,
+  CASE WHEN v.venda_contabilizado_em IS NOT NULL THEN 1 ELSE 0 END AS is_venda,
   CASE WHEN EXISTS (
     SELECT 1 FROM f_historico_etapa_processo h
     WHERE h.id_processo = v.processo_id

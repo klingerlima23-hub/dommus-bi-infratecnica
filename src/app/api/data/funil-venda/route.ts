@@ -32,6 +32,14 @@ SELECT
   v.processo_unidade_id,
   v.etapas_workflow_nome              AS etapa_atual,
   CASE WHEN v.processo_unidade_id > 0 AND v.processo_data_venda IS NOT NULL THEN 1 ELSE 0 END AS is_venda,
+  -- Alias necessario pro front-end (_FunilVenda.tsx) que filtra a cohort
+  -- de "Venda" por venda_contabilizado_em. No modelo Infratecnica nao ha
+  -- coluna separada de contabilizacao; a data efetiva da venda e' a
+  -- propria processo_data_venda quando o processo tem unidade vinculada.
+  CASE WHEN v.processo_unidade_id > 0 AND v.processo_data_venda IS NOT NULL
+       THEN v.processo_data_venda
+       ELSE NULL
+  END AS venda_contabilizado_em,
   CASE WHEN EXISTS (
     SELECT 1 FROM f_historico_etapa_processo h
     WHERE h.id_processo = v.processo_id

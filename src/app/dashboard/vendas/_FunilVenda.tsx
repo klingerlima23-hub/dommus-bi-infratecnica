@@ -82,44 +82,35 @@ export default function VendasFunilVenda() {
     };
   }, []);
 
-  // Filtra apenas por empreendimento (sem data) — o filtro de data
-  // varia por metrica abaixo.
-  const baseEmp = useMemo(
-    () => rows.filter((r) => !empSel.length || empSel.includes(r.empreendimento_nome)),
-    [rows, empSel],
-  );
+  // Replica `render_vendas_funil_de_venda` do dashboard.py do Streamlit
+  // Infratecnica. Cohorte UNICA filtrada por processo_cadastrado_em no periodo
+  // (e opcionalmente empreendimento). Todas as 5 etapas operam sobre essa base.
+  const cohort = useMemo(() => {
+    let base = rows;
+    if (empSel.length) base = base.filter((r) => empSel.includes(r.empreendimento_nome));
+    return filtrarPorPeriodo(base, 'processo_cadastrado_em', period);
+  }, [rows, empSel, period]);
 
-  // Coortes por metrica — mesma regra usada na Visao Atual:
-  //  Cadastro / Aprovado IF / Contrato:  filtra por processo_cadastrado_em
-  //  Pastas:                              filtra por processo_data_venda
-  //  Venda:                               filtra por venda_contabilizado_em
-  const cohorts = useMemo(() => {
-    return {
-      cad: filtrarPorPeriodo(baseEmp, 'processo_cadastrado_em', period),
-      pas: filtrarPorPeriodo(baseEmp, 'processo_data_venda', period),
-      aprIf: filtrarPorPeriodo(baseEmp, 'processo_cadastrado_em', period),
-      cont: filtrarPorPeriodo(baseEmp, 'processo_cadastrado_em', period),
-      ven: filtrarPorPeriodo(baseEmp, 'venda_contabilizado_em', period),
-    };
-  }, [baseEmp, period]);
+  // Contagem sobre a cohorte unica:
+  //   Cadastro    = todos os processos
+  //   Pastas      = reached_pastas = 1        (passou por 'Ficha Cadastral Completa')
+  //   Aprovado IF = reached_aprovado_if = 1   (passou por 'Aprovado pela Instituicao Financeira')
+  //   Contrato    = reached_contrato = 1      (passou por 'Contrato de Compra e Venda Gerado')
+  //   Venda       = is_venda = 1              (processo_unidade_id > 0 AND processo_data_venda)
+  const totalCad = cohort.length;
+  const totalPas = cohort.filter((r) => r.reached_pastas === 1).length;
+  const totalAprIf = cohort.filter((r) => r.reached_aprovado_if === 1).length;
+  const totalCont = cohort.filter((r) => r.reached_contrato === 1).length;
+  const totalVen = cohort.filter((r) => r.is_venda === 1).length;
 
-  // Pastas e Venda ja' estao restritos pelo filtro de periodo no campo certo
-  // (data_venda / venda_contabilizado_em), entao .length basta.
-  // Aprovado IF e Contrato precisam filtrar a flag dentro do coorte de cadastro.
-  const totalCad = cohorts.cad.length;
-  const totalPas = cohorts.pas.length;
-  const totalAprIf = cohorts.aprIf.filter((r) => r.reached_aprovado_if === 1).length;
-  const totalCont = cohorts.cont.filter((r) => r.reached_contrato === 1).length;
-  const totalVen = cohorts.ven.length;
-
-  const vgvPas = cohorts.pas.reduce(
-    (s, r) => s + (Number(r.analise_credito_financiamento) || 0),
-    0,
-  );
-  const vgvVen = cohorts.ven.reduce(
-    (s, r) => s + (Number(r.unidade_valor_liquido) || 0),
-    0,
-  );
+  // VGV de Pastas = soma de analise_credito_financiamento para os que atingiram Pastas
+  // VGV de Venda  = soma de unidade_valor_liquido para os que sao venda
+  const vgvPas = cohort
+    .filter((r) => r.reached_pastas === 1)
+    .reduce((s, r) => s + (Number(r.analise_credito_financiamento) || 0), 0);
+  const vgvVen = cohort
+    .filter((r) => r.is_venda === 1)
+    .reduce((s, r) => s + (Number(r.unidade_valor_liquido) || 0), 0);
 
   const pctPas = totalCad ? (totalPas / totalCad) * 100 : 0;
   const pctAprIf = totalCad ? (totalAprIf / totalCad) * 100 : 0;
@@ -138,7 +129,7 @@ export default function VendasFunilVenda() {
   // (eixo coorte = data de cadastro).
   const porEmp = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of cohorts.cad) {
+    for (const r of cohort) {
       const k = r.empreendimento_nome || '(sem empreendimento)';
       map.set(k, (map.get(k) ?? 0) + 1);
     }
@@ -146,7 +137,7 @@ export default function VendasFunilVenda() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([key, value]) => ({ key, value }));
-  }, [cohorts.cad]);
+  }, [cohort]);
 
   const empOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.empreendimento_nome).filter(Boolean))).sort(),
@@ -177,7 +168,7 @@ export default function VendasFunilVenda() {
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
-          label="Período (cada métrica usa sua data)"
+          label="Período (data de cadastro do processo)"
           start={period.start}
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
@@ -197,7 +188,7 @@ export default function VendasFunilVenda() {
           titulo="Pastas"
           valor={fmtInt(totalPas)}
           vgv={fmtMoeda(vgvPas)}
-          legenda={`${fmtPct(pctPas)} sobre cadastros - com data de venda preenchida`}
+          legenda={`${fmtPct(pctPas)} sobre cadastros - ficha cadastral completa`}
           estilo="warning"
         />
         <KPICard
@@ -216,7 +207,7 @@ export default function VendasFunilVenda() {
           titulo="Venda"
           valor={fmtInt(totalVen)}
           vgv={fmtMoeda(vgvVen)}
-          legenda={`${fmtPct(pctVen)} sobre cadastros - com data de contabilizacao preenchida`}
+          legenda={`${fmtPct(pctVen)} sobre cadastros - contrato com unidade`}
           estilo="success"
         />
       </div>
@@ -232,7 +223,7 @@ export default function VendasFunilVenda() {
       </div>
 
       <SectionTitle>Detalhe</SectionTitle>
-      <DataTable rows={cohorts.cad} columns={colunasTabela} filename="funil_venda.csv" />
+      <DataTable rows={cohort} columns={colunasTabela} filename="funil_venda.csv" />
     </div>
   );
 }

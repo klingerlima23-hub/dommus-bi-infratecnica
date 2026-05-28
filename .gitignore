@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+.next/
+out/
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Streamlit secrets (NUNCA commitar - contem credenciais reais do DW)
+**/.streamlit/secrets.toml
+**/.streamlit/secrets.local.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+.vercel
+.idea/
+.vscode/
+.pipeline_state.json
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

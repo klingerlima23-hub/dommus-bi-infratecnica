@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 215 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 209 78% 28%;        /* #0F4C81 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 20% 96%;
+    --secondary-foreground: 215 25% 15%;
+    --muted: 215 20% 96%;
+    --muted-foreground: 215 15% 40%;
+    --accent: 33 95% 55%;          /* #F6A623 */
+    --accent-foreground: 215 25% 15%;
+    --destructive: 0 73% 57%;      /* #E74C3C */
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 17% 92%;         /* #E5E9F0 */
+    --input: 220 17% 92%;
+    --ring: 209 78% 28%;
+    --radius: 10px;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-white text-foreground antialiased;
+    font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* WhatsApp Floating Action Button (replicado do v001) */
+.whatsapp-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  background: #25D366;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.whatsapp-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(37, 211, 102, 0.5);
+}
+
+/* Splash de loading na transição login → dashboard */
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  background: #F4F6FA;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+.splash-spinner {
+  width: 56px;
+  height: 56px;
+  border: 5px solid rgba(15, 76, 129, 0.18);
+  border-top-color: #0F4C81;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  margin-bottom: 1.2rem;
+}
+.splash-text {
+  color: #0F4C81;
+  font-size: 0.95rem;
+  font-weight: 600;
+}

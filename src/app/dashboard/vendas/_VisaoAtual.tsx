@@ -396,7 +396,16 @@ export default function VendasVisaoAtual() {
 
       {/* Tabela */}
       <SectionTitle>Detalhe</SectionTitle>
-      <DataTable rows={dfMetrica} columns={colunasTabela} filename={`vendas_${metrica}.csv`} />
+      <DataTable
+        rows={dfMetrica}
+        columns={colunasTabela}
+        filename={`vendas_${metrica}.csv`}
+        getRowHref={(r) =>
+          r.processo_id
+            ? `https://infratecnica.dommus2.com.br/2.0/index_ui.php?mgr=MQ==&ui=NjM=&id_processo=${r.processo_id}`
+            : null
+        }
+      />
     </div>
   );
 }

@@ -223,7 +223,16 @@ export default function VendasFunilVenda() {
       </div>
 
       <SectionTitle>Detalhe</SectionTitle>
-      <DataTable rows={cohort} columns={colunasTabela} filename="funil_venda.csv" />
+      <DataTable
+        rows={cohort}
+        columns={colunasTabela}
+        filename="funil_venda.csv"
+        getRowHref={(r) =>
+          r.id_processo
+            ? `https://infratecnica.dommus2.com.br/2.0/index_ui.php?mgr=MQ==&ui=NjM=&id_processo=${r.id_processo}`
+            : null
+        }
+      />
     </div>
   );
 }

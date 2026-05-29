@@ -19,6 +19,12 @@ interface Props<T extends object> {
   emptyMessage?: string;
   enableExport?: boolean;
   filename?: string;
+  /**
+   * Se fornecido, cada linha vira clicavel e abre a URL retornada em nova aba
+   * ao clicar em qualquer celula. Retorne null/undefined para nao gerar link
+   * (a linha continua nao-clicavel).
+   */
+  getRowHref?: (row: T) => string | null | undefined;
 }
 
 function formatCell(v: unknown, type: ColType = 'string'): string {
@@ -71,6 +77,7 @@ export default function DataTable<T extends object>({
   emptyMessage = 'Sem dados.',
   enableExport = true,
   filename = 'dados.csv',
+  getRowHref,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -137,15 +144,30 @@ export default function DataTable<T extends object>({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r, i) => (
-              <tr key={i} className="border-t border-[#E5E9F0] hover:bg-[#F7F9FC]">
-                {columns.map((c) => (
-                  <td key={c.key} className="px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]">
-                    {formatCell(r[c.key], c.type)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {sorted.map((r, i) => {
+              const href = getRowHref?.(r) ?? null;
+              const clickable = !!href;
+              const handleClick = clickable
+                ? () => window.open(href!, '_blank', 'noopener,noreferrer')
+                : undefined;
+              return (
+                <tr
+                  key={i}
+                  onClick={handleClick}
+                  className={
+                    'border-t border-[#E5E9F0] hover:bg-[#F7F9FC]' +
+                    (clickable ? ' cursor-pointer' : '')
+                  }
+                  title={clickable ? 'Clique para abrir no CRM (nova aba)' : undefined}
+                >
+                  {columns.map((c) => (
+                    <td key={c.key} className="px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]">
+                      {formatCell(r[c.key], c.type)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

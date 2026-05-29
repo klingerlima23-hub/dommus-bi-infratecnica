@@ -433,7 +433,16 @@ export default function LeadFunilInvestimento() {
       </div>
 
       <SectionTitle>Detalhe</SectionTitle>
-      <DataTable rows={detalheRows} columns={colunas} filename="lead_funil_detalhe.csv" />
+      <DataTable
+        rows={detalheRows}
+        columns={colunas}
+        filename="lead_funil_detalhe.csv"
+        getRowHref={(r) =>
+          r.id_oportunidade
+            ? `https://leads.dommus.com.br/oportunidade/${r.id_oportunidade}`
+            : null
+        }
+      />
     </div>
   );
 }

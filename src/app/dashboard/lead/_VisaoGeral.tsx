@@ -289,7 +289,16 @@ export default function LeadVisaoGeral() {
       </div>
 
       <SectionTitle>Detalhe</SectionTitle>
-      <DataTable rows={filtrado} columns={colunas} filename="lead_visao_geral.csv" />
+      <DataTable
+        rows={filtrado}
+        columns={colunas}
+        filename="lead_visao_geral.csv"
+        getRowHref={(r) =>
+          r.id_oportunidade
+            ? `https://leads.dommus.com.br/oportunidade/${r.id_oportunidade}`
+            : null
+        }
+      />
     </div>
   );
 }

@@ -50,13 +50,18 @@ export default function DateRangeFilter({ label, start, end, onChange }: Props) 
       <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-[#5A6677] mb-1.5">
         {label}
       </label>
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Container unico: datas + 'ate' + Aplicar dentro de UMA caixa branca
+          com borda fina, igual ao mockup. Os <input type=date> ficam sem
+          borda propria (transparentes); o 'Aplicar' fica como texto/link
+          bold a direita -- azul Dommus quando ha mudanca pendente, cinza
+          claro (desabilitado) quando nao ha. */}
+      <div className="inline-flex items-center gap-2 bg-white border border-[#E5E9F0] rounded-md px-3 py-1.5 focus-within:border-[#0F4C81] transition">
         <input
           type="date"
           value={pendingStart}
           onChange={(e) => setPendingStart(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="px-3 py-2 bg-[#F4F6FA] border border-[#E5E9F0] rounded-md text-sm focus:bg-white focus:border-[#0F4C81] focus:outline-none transition"
+          className="bg-transparent border-0 outline-none text-sm text-[#1A2B3C] px-1"
         />
         <span className="text-[#5A6677] text-sm">ate</span>
         <input
@@ -64,7 +69,7 @@ export default function DateRangeFilter({ label, start, end, onChange }: Props) 
           value={pendingEnd}
           onChange={(e) => setPendingEnd(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="px-3 py-2 bg-[#F4F6FA] border border-[#E5E9F0] rounded-md text-sm focus:bg-white focus:border-[#0F4C81] focus:outline-none transition"
+          className="bg-transparent border-0 outline-none text-sm text-[#1A2B3C] px-1"
         />
         <button
           type="button"
@@ -72,10 +77,10 @@ export default function DateRangeFilter({ label, start, end, onChange }: Props) 
           disabled={!dirty}
           title={dirty ? 'Aplicar o periodo selecionado' : 'Nenhuma alteracao pendente'}
           className={
-            'px-4 py-2 rounded-md text-sm font-semibold transition border ' +
+            'ml-1 pl-2 text-sm font-bold transition ' +
             (dirty
-              ? 'bg-[#0F4C81] text-white border-[#0F4C81] hover:bg-[#0B3A66] cursor-pointer'
-              : 'bg-[#F4F6FA] text-[#5A6677] border-[#E5E9F0] cursor-not-allowed')
+              ? 'text-[#1A2B3C] hover:text-[#0F4C81] cursor-pointer'
+              : 'text-[#B0BEC5] cursor-not-allowed')
           }
         >
           Aplicar

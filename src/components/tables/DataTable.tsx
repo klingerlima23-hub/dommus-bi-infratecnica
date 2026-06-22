@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useMemo, useState } from 'react';
+import { type MouseEvent, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { fmtData, fmtMoeda, fmtInt } from '@/lib/format';
 
@@ -11,6 +11,12 @@ export interface Column<T> {
   label: string;
   type?: ColType;
   width?: number;
+  /**
+   * Se definido, a celula renderiza um link <a target="_blank"> apontando
+   * pra URL retornada (a partir da row inteira). Util para abrir processos
+   * no CRM Infratecnica / leads.dommus.com.br direto da tabela.
+   */
+  link?: (row: T) => string | null;
 }
 
 interface Props<T extends object> {
@@ -20,11 +26,11 @@ interface Props<T extends object> {
   enableExport?: boolean;
   filename?: string;
   /**
-   * Se fornecido, cada linha vira clicavel e abre a URL retornada em nova aba
-   * ao clicar em qualquer celula. Retorne null/undefined para nao gerar link
-   * (a linha continua nao-clicavel).
+   * Se definido, a LINHA INTEIRA fica clicavel -- abre a URL retornada
+   * em nova aba. Aplica cursor-pointer e hover destacado.
+   * Util pra abrir o processo no CRM ou a oportunidade no leads.
    */
-  getRowHref?: (row: T) => string | null | undefined;
+  rowLink?: (row: T) => string | null;
 }
 
 function formatCell(v: unknown, type: ColType = 'string'): string {
@@ -55,14 +61,14 @@ function exportCsv<T extends object>(rows: T[], cols: Column<T>[], filename: str
     lines.push(
       cols
         .map((c) => {
-          const v = r[c.key];
+          const v = (r as Record<string, unknown>)[c.key];
           const s = v === null || v === undefined ? '' : String(v).replace(/"/g, '""');
           return `"${s}"`;
         })
         .join(';')
     );
   }
-  const blob = new Blob(['ï»¿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -77,7 +83,7 @@ export default function DataTable<T extends object>({
   emptyMessage = 'Sem dados.',
   enableExport = true,
   filename = 'dados.csv',
-  getRowHref,
+  rowLink,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -145,26 +151,46 @@ export default function DataTable<T extends object>({
           </thead>
           <tbody>
             {sorted.map((r, i) => {
-              const href = getRowHref?.(r) ?? null;
-              const clickable = !!href;
-              const handleClick = clickable
-                ? () => window.open(href!, '_blank', 'noopener,noreferrer')
+              const rowHref = rowLink ? rowLink(r) : null;
+              const trClass = rowHref
+                ? 'border-t border-[#E5E9F0] hover:bg-[#EAF2FB] cursor-pointer transition'
+                : 'border-t border-[#E5E9F0] hover:bg-[#F7F9FC]';
+              const handleClick = rowHref
+                ? (e: MouseEvent<HTMLTableRowElement>) => {
+                    // Se clicou num link interno (coluna com 'link'), deixa o
+                    // proprio link abrir e nao dispara o rowLink (evita 2 tabs).
+                    if ((e.target as HTMLElement).closest('a')) return;
+                    window.open(rowHref, '_blank', 'noopener,noreferrer');
+                  }
                 : undefined;
               return (
                 <tr
                   key={i}
+                  className={trClass}
                   onClick={handleClick}
-                  className={
-                    'border-t border-[#E5E9F0] hover:bg-[#F7F9FC]' +
-                    (clickable ? ' cursor-pointer' : '')
-                  }
-                  title={clickable ? 'Clique para abrir no CRM (nova aba)' : undefined}
+                  title={rowHref ? 'Clique para abrir em nova aba' : undefined}
                 >
-                  {columns.map((c) => (
-                    <td key={c.key} className="px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]">
-                      {formatCell(r[c.key], c.type)}
-                    </td>
-                  ))}
+                  {columns.map((c) => {
+                    const valor = formatCell((r as Record<string, unknown>)[c.key], c.type);
+                    const href = c.link ? c.link(r) : null;
+                    return (
+                      <td key={c.key} className="px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]">
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#0F4C81] font-semibold hover:underline"
+                            title="Abrir em nova aba"
+                          >
+                            {valor}
+                          </a>
+                        ) : (
+                          valor
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}

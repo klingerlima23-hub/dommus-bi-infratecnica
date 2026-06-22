@@ -15,6 +15,7 @@ import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
 import { fmtInt, fmtMoeda, fmtPct, bucketDate, groupByCount, type Granularidade } from '@/lib/format';
 import { COR_PRIMARIA } from '@/lib/paleta';
+import { urlProcesso } from '@/lib/urls';
 
 interface Row {
   processo_id: number;
@@ -400,11 +401,7 @@ export default function VendasVisaoAtual() {
         rows={dfMetrica}
         columns={colunasTabela}
         filename={`vendas_${metrica}.csv`}
-        getRowHref={(r) =>
-          r.processo_id
-            ? `https://infratecnica.dommus2.com.br/2.0/index_ui.php?mgr=MQ==&ui=NjM=&id_processo=${r.processo_id}`
-            : null
-        }
+        rowLink={(r) => urlProcesso(r.processo_id)}
       />
     </div>
   );

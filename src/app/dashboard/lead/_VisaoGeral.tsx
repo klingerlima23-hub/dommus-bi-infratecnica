@@ -13,6 +13,7 @@ import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
 import { fmtInt, fmtPct, bucketDate, type Granularidade, groupByCount } from '@/lib/format';
+import { urlOportunidade } from '@/lib/urls';
 
 interface RowOp {
   id_oportunidade: number;
@@ -293,11 +294,7 @@ export default function LeadVisaoGeral() {
         rows={filtrado}
         columns={colunas}
         filename="lead_visao_geral.csv"
-        getRowHref={(r) =>
-          r.id_oportunidade
-            ? `https://leads.dommus.com.br/oportunidade/${r.id_oportunidade}`
-            : null
-        }
+        rowLink={(r) => urlOportunidade(r.id_oportunidade)}
       />
     </div>
   );

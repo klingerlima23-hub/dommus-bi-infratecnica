@@ -12,6 +12,7 @@ import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
 import { fmtInt, fmtMoeda, fmtPct } from '@/lib/format';
 import { COR_PRIMARIA } from '@/lib/paleta';
+import { urlProcesso } from '@/lib/urls';
 
 interface Row {
   id_processo: number;
@@ -227,11 +228,7 @@ export default function VendasFunilVenda() {
         rows={cohort}
         columns={colunasTabela}
         filename="funil_venda.csv"
-        getRowHref={(r) =>
-          r.id_processo
-            ? `https://infratecnica.dommus2.com.br/2.0/index_ui.php?mgr=MQ==&ui=NjM=&id_processo=${r.id_processo}`
-            : null
-        }
+        rowLink={(r) => urlProcesso(r.id_processo)}
       />
     </div>
   );

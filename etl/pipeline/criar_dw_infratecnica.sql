@@ -15,6 +15,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ---------- d_corretor ----------
 CREATE TABLE IF NOT EXISTS `d_corretor` (
   `id_corretor` BIGINT NULL,
+  `id_corretor_rk` BIGINT NULL COMMENT 'ranking incremental do corretor',
   `id_equipe` BIGINT NULL,
   `tipo_corretor` VARCHAR(255) NULL,
   `nome_corretor` VARCHAR(255) NULL,
@@ -295,6 +296,9 @@ CREATE TABLE IF NOT EXISTS `f_venda` (
   `proponente3_cpf` VARCHAR(20) NULL COMMENT 'varchar(20)',
   `proponente3_profissao` VARCHAR(255) NULL COMMENT 'varchar(255)',
   `proponente3_email` VARCHAR(255) NULL COMMENT 'varchar(255)',
+  `id_gerente` BIGINT NULL COMMENT 'int',
+  `id_corretor` BIGINT NULL COMMENT 'int',
+  `id_equipe` BIGINT NULL COMMENT 'int',
   `gerente_nome` VARCHAR(255) NULL COMMENT 'varchar(255)',
   `corretor_nome` VARCHAR(255) NULL COMMENT 'varchar(255)',
   `operador_coban_nome` VARCHAR(255) NULL COMMENT 'varchar(255)',

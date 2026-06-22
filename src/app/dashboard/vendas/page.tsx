@@ -4,8 +4,9 @@ import { useState } from 'react';
 import RadioGroup from '@/components/filters/RadioGroup';
 import VendasVisaoAtual from './_VisaoAtual';
 import VendasFunilVenda from './_FunilVenda';
+import VendasRanking from './_RankingVendas';
 
-const SUB_ABAS = ['Visao Atual', 'Funil de Venda'] as const;
+const SUB_ABAS = ['Visao Atual', 'Funil de Venda', 'Ranking Vendas'] as const;
 type SubAba = (typeof SUB_ABAS)[number];
 
 export default function VendasPage() {
@@ -15,7 +16,9 @@ export default function VendasPage() {
       <div className="mb-6">
         <RadioGroup label="Visao" options={SUB_ABAS} value={aba} onChange={setAba} />
       </div>
-      {aba === 'Visao Atual' ? <VendasVisaoAtual /> : <VendasFunilVenda />}
+      {aba === 'Visao Atual' && <VendasVisaoAtual />}
+      {aba === 'Funil de Venda' && <VendasFunilVenda />}
+      {aba === 'Ranking Vendas' && <VendasRanking />}
     </div>
   );
 }

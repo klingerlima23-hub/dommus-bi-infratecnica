@@ -51,7 +51,11 @@ DATA_FIM    = "2099-12-31 23:59:59"
 
 PAGE_SIZE       = 1000
 PAGE_SIZE_MIN   = 100
-WRITE_CHUNKSIZE = 500
+# f_venda tem ~124 colunas. Com chunksize=500 o INSERT vira ~62k placeholders,
+# encostando no teto do MySQL (65.535/statement) e tambem estourando o
+# max_allowed_packet quando aparecem strings longas (endereco, motivos).
+# 200 linhas x 124 colunas = ~25k placeholders -- folgado.
+WRITE_CHUNKSIZE = 200
 
 
 def gravar_pagina(df):

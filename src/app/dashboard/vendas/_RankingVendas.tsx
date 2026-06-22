@@ -119,7 +119,11 @@ export default function RankingVendas() {
   const [erro, setErro] = useState<string | null>(null);
 
   const [period, setPeriod] = useState(defaultDateRange());
-  const [tipoData, setTipoData] = useState<TipoData>('Data de Venda');
+  // Default 'Data de Contabilizacao' porque na Infratecnica o campo
+  // processo_data_venda fica NULL na maioria dos registros (a venda
+  // entra no fluxo via contabilizacao). Se o usuario quiser, troca
+  // pra 'Data de Venda' manualmente e o fallback abaixo cuida do resto.
+  const [tipoData, setTipoData] = useState<TipoData>('Data de Contabilizacao');
   const [empSel, setEmpSel] = useState<string[]>([]);
   const [gerSel, setGerSel] = useState<string[]>([]);
   const [eqSel, setEqSel] = useState<string[]>([]);
@@ -148,14 +152,22 @@ export default function RankingVendas() {
     };
   }, []);
 
-  const dateField: keyof Row =
-    tipoData === 'Data de Venda' ? 'venda_data' : 'venda_contabilizado_em';
+  // Pega a data de referencia da linha conforme o modo selecionado.
+  // 'Data de Venda' tenta venda_data primeiro (tb_venda.data), faz fallback
+  // pra processo_data_venda (tb_processo.data_venda) -- garante que o filtro
+  // funcione mesmo com qualidade de dado heterogenea.
+  function getDateOf(r: Row): string | null {
+    if (tipoData === 'Data de Venda') {
+      return r.venda_data || r.processo_data_venda || null;
+    }
+    return r.venda_contabilizado_em || null;
+  }
 
   const filtered = useMemo(() => {
     const ini = new Date(period.start);
     const fim = new Date(period.end + 'T23:59:59');
     return rows.filter((r) => {
-      const v = r[dateField] as string | null;
+      const v = getDateOf(r);
       if (!v) return false;
       const d = new Date(v);
       if (d < ini || d > fim) return false;
@@ -164,7 +176,7 @@ export default function RankingVendas() {
       if (eqSel.length && !eqSel.includes(r.equipe_nome || '')) return false;
       return true;
     });
-  }, [rows, period, dateField, empSel, gerSel, eqSel]);
+  }, [rows, period, tipoData, empSel, gerSel, eqSel]);
 
   const ranking: RankItem[] = useMemo(() => {
     const map = new Map<

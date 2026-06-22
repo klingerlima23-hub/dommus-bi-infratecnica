@@ -80,9 +80,13 @@ export async function GET(req: Request) {
     if (debug) {
       const meta = await query(SQL_DEBUG);
       const sample = await query(
-        'SELECT processo_id, id_corretor, corretor_nome, processo_data_venda, venda_data, venda_contabilizado_em FROM f_venda ORDER BY venda_contabilizado_em DESC LIMIT 5',
+        'SELECT processo_id, id_gerente, id_corretor, id_equipe, corretor_nome, gerente_nome, equipe_nome FROM f_venda WHERE venda_contabilizado_em IS NOT NULL ORDER BY venda_contabilizado_em DESC LIMIT 5',
       );
-      return NextResponse.json({ meta: meta[0], sample });
+      // DESCRIBE pra confirmar quais colunas REALMENTE existem na f_venda atual
+      const cols = await query('SHOW COLUMNS FROM f_venda LIKE "%corretor%"');
+      // Sample do d_corretor pra ver os tipos
+      const dc = await query('SELECT id_corretor, id_corretor_rk, nome_corretor FROM d_corretor WHERE id_corretor_rk IS NOT NULL LIMIT 3');
+      return NextResponse.json({ meta: meta[0], sample, cols, dc });
     }
     const rows = await query(SQL);
     return NextResponse.json({ rows });

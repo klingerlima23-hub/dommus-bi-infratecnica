@@ -24,6 +24,7 @@ interface Row {
   unidade_descricao: string | null;
   processo_cadastrado_em: string | null;
   processo_data_venda: string | null;
+  venda_data: string | null;
   venda_contabilizado_em: string | null;
   etapa_atual: string | null;
   lead_origem: string | null;
@@ -148,7 +149,7 @@ export default function RankingVendas() {
   }, []);
 
   const dateField: keyof Row =
-    tipoData === 'Data de Venda' ? 'processo_data_venda' : 'venda_contabilizado_em';
+    tipoData === 'Data de Venda' ? 'venda_data' : 'venda_contabilizado_em';
 
   const filtered = useMemo(() => {
     const ini = new Date(period.start);
@@ -615,6 +616,7 @@ function DetalhamentoTable({ rows }: { rows: Row[] }) {
     gerente_nome: r.gerente_nome ?? '',
     processo_cadastrado_em: r.processo_cadastrado_em,
     processo_data_venda: r.processo_data_venda,
+    venda_data: r.venda_data,
     venda_contabilizado_em: r.venda_contabilizado_em,
     empreendimento_nome: r.empreendimento_nome ?? '',
     unidade_descricao: r.unidade_descricao ?? '',

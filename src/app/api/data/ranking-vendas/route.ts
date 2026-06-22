@@ -35,6 +35,7 @@ SELECT
   v.unidade_descricao,
   v.processo_cadastrado_em,
   v.processo_data_venda,
+  v.venda_data,
   v.venda_contabilizado_em,
   v.etapas_workflow_nome                           AS etapa_atual,
   v.lead_origem,

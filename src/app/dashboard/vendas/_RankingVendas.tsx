@@ -230,14 +230,19 @@ export default function RankingVendas() {
 
   return (
     <div>
-      {/* ============ FILTROS ============ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
-        <DateRangeFilter
-          label={`Periodo (${tipoData.toLowerCase()})`}
-          start={period.start}
-          end={period.end}
-          onChange={(start, end) => setPeriod({ start, end })}
-        />
+      {/* ============ FILTROS ============
+          Grid em 6 colunas no lg pra acomodar o DateRangeFilter (2 inputs
+          + botao Aplicar) sem quebrar em 2 linhas. Periodo + RadioGroup
+          ocupam metade da linha; os 3 multi-select pegam a outra metade. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+        <div className="lg:col-span-2">
+          <DateRangeFilter
+            label={`Periodo (${tipoData.toLowerCase()})`}
+            start={period.start}
+            end={period.end}
+            onChange={(start, end) => setPeriod({ start, end })}
+          />
+        </div>
         <RadioGroup
           label="Filtrar por"
           options={TIPOS_DATA}

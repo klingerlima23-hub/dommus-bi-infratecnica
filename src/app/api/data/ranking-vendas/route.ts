@@ -35,7 +35,6 @@ SELECT
   v.unidade_descricao,
   v.processo_cadastrado_em,
   v.processo_data_venda,
-  v.venda_data,
   v.venda_contabilizado_em,
   v.etapas_workflow_nome                           AS etapa_atual,
   v.lead_origem,
@@ -55,13 +54,7 @@ LEFT JOIN (
   GROUP BY id_corretor_rk
 ) d ON d.id_corretor_rk = v.id_corretor
 WHERE v.id_corretor IS NOT NULL
-  AND v.venda_contabilizado_em IS NOT NULL
--- Restringe a vendas efetivamente CONTABILIZADAS (financeiro confirmou).
--- processo_data_venda fica populado pra muitos processos com mera
--- "intencao de venda" registrada (1131 em junho/26), enquanto vendas
--- reais sao apenas as contabilizadas (~10/mes). O toggle de tipo de
--- data apenas escolhe QUAL data usar pra filtrar, mas o conjunto base
--- sao sempre vendas contabilizadas.
+  AND (v.processo_data_venda IS NOT NULL OR v.venda_contabilizado_em IS NOT NULL)
 `;
 
 // Diagnostico: aceita ?debug=1 e retorna contagens em cada nivel de

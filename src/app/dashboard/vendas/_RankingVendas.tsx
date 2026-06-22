@@ -152,13 +152,12 @@ export default function RankingVendas() {
     };
   }, []);
 
-  // Pega a data de referencia da linha conforme o modo selecionado.
-  // 'Data de Venda' tenta venda_data primeiro (tb_venda.data), faz fallback
-  // pra processo_data_venda (tb_processo.data_venda) -- garante que o filtro
-  // funcione mesmo com qualidade de dado heterogenea.
+  // Mapeamento direto, sem fallback:
+  //   Data de Venda          -> processo_data_venda
+  //   Data de Contabilizacao -> venda_contabilizado_em
   function getDateOf(r: Row): string | null {
     if (tipoData === 'Data de Venda') {
-      return r.venda_data || r.processo_data_venda || null;
+      return r.processo_data_venda || null;
     }
     return r.venda_contabilizado_em || null;
   }

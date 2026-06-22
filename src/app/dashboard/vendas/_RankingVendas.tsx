@@ -231,11 +231,13 @@ export default function RankingVendas() {
   return (
     <div>
       {/* ============ FILTROS ============
-          Grid em 6 colunas no lg pra acomodar o DateRangeFilter (2 inputs
-          + botao Aplicar) sem quebrar em 2 linhas. Periodo + RadioGroup
-          ocupam metade da linha; os 3 multi-select pegam a outra metade. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
-        <div className="lg:col-span-2">
+          Grid em 12 colunas no lg, divisao 3+3+2+2+2 = 12:
+            - Periodo (2 inputs + Aplicar)        -> 3 cols
+            - Filtrar por (RadioGroup 2 opcoes)   -> 3 cols  (cabe "Data de Venda" + "Data de Contabilizacao" inline)
+            - Empreendimento / Equipe / Gerente   -> 2 cols cada
+          Em md vira 2 colunas; em mobile, 1. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+        <div className="lg:col-span-3">
           <DateRangeFilter
             label={`Periodo (${tipoData.toLowerCase()})`}
             start={period.start}
@@ -243,30 +245,38 @@ export default function RankingVendas() {
             onChange={(start, end) => setPeriod({ start, end })}
           />
         </div>
-        <RadioGroup
-          label="Filtrar por"
-          options={TIPOS_DATA}
-          value={tipoData}
-          onChange={setTipoData}
-        />
-        <MultiSelectFilter
-          label="Empreendimento"
-          options={empOptions}
-          selected={empSel}
-          onChange={setEmpSel}
-        />
-        <MultiSelectFilter
-          label="Equipe"
-          options={eqOptions}
-          selected={eqSel}
-          onChange={setEqSel}
-        />
-        <MultiSelectFilter
-          label="Gerente"
-          options={gerOptions}
-          selected={gerSel}
-          onChange={setGerSel}
-        />
+        <div className="lg:col-span-3">
+          <RadioGroup
+            label="Filtrar por"
+            options={TIPOS_DATA}
+            value={tipoData}
+            onChange={setTipoData}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <MultiSelectFilter
+            label="Empreendimento"
+            options={empOptions}
+            selected={empSel}
+            onChange={setEmpSel}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <MultiSelectFilter
+            label="Equipe"
+            options={eqOptions}
+            selected={eqSel}
+            onChange={setEqSel}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <MultiSelectFilter
+            label="Gerente"
+            options={gerOptions}
+            selected={gerSel}
+            onChange={setGerSel}
+          />
+        </div>
       </div>
 
       {/* ============ KPIs HEADLINE ============ */}

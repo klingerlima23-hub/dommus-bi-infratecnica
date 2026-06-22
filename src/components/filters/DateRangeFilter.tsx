@@ -58,7 +58,7 @@ export default function DateRangeFilter({ label, start, end, onChange }: Props) 
           onKeyDown={handleKeyDown}
           className="px-3 py-2 bg-[#F4F6FA] border border-[#E5E9F0] rounded-md text-sm focus:bg-white focus:border-[#0F4C81] focus:outline-none transition"
         />
-        <span className="text-[#5A6677]">→</span>
+        <span className="text-[#5A6677] text-sm">ate</span>
         <input
           type="date"
           value={pendingEnd}

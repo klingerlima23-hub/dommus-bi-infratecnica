@@ -192,6 +192,9 @@ WITH
       CONCAT(SUBSTR(LPAD(p3.cpf,11,'0'),1,3), '.', SUBSTR(p3.cpf,4,3), '.', SUBSTR(p3.cpf,7,3), '-', SUBSTR(p3.cpf,10,2)) AS 'proponente3_cpf',  -- varchar(20)
       pr3.profissao                   						  AS 'proponente3_profissao',  -- varchar(255)
       lower((SELECT pc.valor FROM dommus_infratecnica.tb_proponente_contato pc WHERE pc.tipo_contato='E' AND pc.referencia_contato='21' AND pc.status='1' AND pc.oculto='N' AND pc.proponente=p3.id LIMIT 1)) AS 'proponente3_email',  -- varchar(255)
+      p.gerente                                               AS 'id_gerente',    -- int
+      p.corretor                                              AS 'id_corretor',   -- int
+      p.equipe                                                AS 'id_equipe',     -- int
       g.nome                                                  AS 'gerente_nome',  -- varchar(255)
       c.nome                                                  AS 'corretor_nome', -- varchar(255)
       oc.nome                                                 AS 'operador_coban_nome', -- varchar(255)

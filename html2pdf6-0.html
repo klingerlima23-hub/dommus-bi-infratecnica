@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Arquitetura BI - crm_inquilino_0040_infratecnica_v1</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Arquitetura BI - crm_inquilino_0040_infratecnica_v1</h1>
+</header>
+<h1 id="arquitetura-de-bi-dashboard-crm_inquilino_0040_infratecnica_v1">Arquitetura de BI + Dashboard — <code>crm_inquilino_0040_infratecnica_v1</code></h1>
+<p>Documento técnico que descreve a <strong>arquitetura</strong> da plataforma de BI Comercial do cliente Dommus #0040 — Infratécnica: estrutura do ETL, modelo de dados, dashboard e segurança.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<tbody>
+<tr class="odd">
+<td><strong>Cliente</strong></td>
+<td>Dommus #0040 — Infratécnica</td>
+</tr>
+<tr class="even">
+<td><strong>Tipo de projeto</strong></td>
+<td>BI Comercial (ETL + Dashboard)</td>
+</tr>
+<tr class="odd">
+<td><strong>Modelagem dimensional</strong></td>
+<td>Star schema (1 fato central por assunto + dimensões compartilhadas)</td>
+</tr>
+<tr class="even">
+<td><strong>Repositório</strong></td>
+<td>github.com/klingerlima23-hub/dommus-bi-infratecnica</td>
+</tr>
+<tr class="odd">
+<td><strong>URL pública</strong></td>
+<td>https://dommus-bi-infratecnica.vercel.app</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><em>Última atualização: <strong>28/05/2026</strong> por <strong>Klinger Lima</strong>, Engenheiro de Dados.</em></p>
+</blockquote>
+<hr />
+<h2 id="sumário">Sumário</h2>
+<ol type="1">
+<li><a href="#1-visão-geral-da-arquitetura">Visão geral da arquitetura</a></li>
+<li><a href="#2-etl--origem-destino-processo">ETL — origem, destino, processo</a></li>
+<li><a href="#3-modelo-de-dados--dw_infratecnica">Modelo de dados — <code>dw_infratecnica</code></a></li>
+<li><a href="#4-dashboard--nextjs-em-ambiente-cloud-serverless">Dashboard — Next.js em ambiente cloud serverless</a></li>
+<li><a href="#5-segurança-e-gestão-de-credenciais">Segurança e gestão de credenciais</a></li>
+<li><a href="#6-separação-de-ambientes">Separação de ambientes</a></li>
+<li><a href="#7-solicitações--histórico-de-alterações">Solicitações — histórico de alterações</a></li>
+</ol>
+<hr />
+<h2 id="visão-geral-da-arquitetura">1. Visão geral da arquitetura</h2>
+<p>A solução é dividida em três ambientes independentes, cada um com sua própria responsabilidade e ciclo de vida:</p>
+<pre><code>+-------------------------+    +--------------------------+    +------------------------+
+|   CRM ORIGEM (AWS)      |    |  ETL (servidor local)    |    |  DW DESTINO (AWS)      |
+|  dommus_infratecnica    |---&gt;|  Python 3.12 + pandas    |---&gt;|  dw_infratecnica       |
+|  crm_inquilino_0040     |    |  TRUNCATE + FULL LOAD    |    |  16 dim + 12 fatos     |
+|  MySQL gerenciado RDS   |    |  Keyset pagination       |    |  + meta_etl_execucao   |
++-------------------------+    +--------------------------+    +------------------------+
+                                                                          |
+                                                                          | (consultas)
+                                                                          v
+                                                              +------------------------+
+                                                              |  DASHBOARD (Vercel)    |
+                                                              |  Next.js 14 + Recharts |
+                                                              |  Auth JWT + bcrypt     |
+                                                              |  Functions serverless  |
+                                                              +------------------------+</code></pre>
+<p><strong>Fluxo dos dados:</strong> 1. O <strong>CRM origem</strong> (na AWS) recebe os dados operacionais do cliente Infratécnica. 2. O <strong>ETL</strong> (rodando no servidor local Dommus) lê os dados do CRM, transforma e carrega no DW destino (também na AWS). 3. O <strong>DW destino</strong> (<code>dw_infratecnica</code>) é onde os dados ficam consolidados em modelo estrela, prontos para consulta analítica. 4. O <strong>Dashboard</strong> (Next.js, hospedado na Vercel) consulta o DW destino via API serverless e renderiza KPIs e gráficos.</p>
+<hr />
+<h2 id="etl-origem-destino-processo">2. ETL — origem, destino, processo</h2>
+<h3 id="bancos-de-origem">2.1. Bancos de origem</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Banco</th>
+<th>Conteúdo</th>
+<th>Localização</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>dommus_infratecnica</code></td>
+<td>Dados detalhados de cliente, usuário, equipe, gerente, corretor, empreendimento, processo de venda</td>
+<td>MySQL gerenciado AWS RDS</td>
+</tr>
+<tr class="even">
+<td><code>crm_inquilino_0040</code></td>
+<td>Oportunidades, leads, funil, mídia, campanha, origem, status, etapa</td>
+<td>MySQL gerenciado AWS RDS</td>
+</tr>
+</tbody>
+</table>
+<h3 id="banco-de-destino">2.2. Banco de destino</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Banco</th>
+<th>Localização</th>
+<th>Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>dw_infratecnica</code></td>
+<td>MySQL na AWS (18.209.74.87:3310)</td>
+<td>16 dimensões + 12 fatos + <code>meta_etl_execucao</code> = <strong>29 tabelas, ~410 colunas</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="onde-o-etl-roda">2.3. Onde o ETL roda</h3>
+<p>O ETL é <strong>executado no servidor local Dommus</strong> (Python 3.12, sem acesso público), no IP de extração liberado pelo CRM origem. Esse servidor estabelece conexões saintes para os bancos de origem (CRMs) e destino (<code>dw_infratecnica</code>) na AWS. As credenciais ficam fora do código-fonte (ver Seção 5).</p>
+<h3 id="estratégia-de-carga">2.4. Estratégia de carga</h3>
+<p><strong>TRUNCATE + FULL LOAD</strong> com paginação adaptativa:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Etapa</th>
+<th>Estratégia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Para cada tabela do DW</td>
+<td><code>TRUNCATE TABLE</code> antes de inserir</td>
+</tr>
+<tr class="even">
+<td>Leitura da origem</td>
+<td>Keyset pagination (page-size adaptativa: 5000 → 1000 → 500)</td>
+</tr>
+<tr class="odd">
+<td>Escrita no DW</td>
+<td><code>INSERT</code> em lote (chunksize 500) com retry e backoff exponencial</td>
+</tr>
+<tr class="even">
+<td>Falhas de conexão</td>
+<td>Mitigação 6 camadas: <code>use_pure=True</code>, <code>SESSION_INIT</code>, <code>pool_recycle</code>, retry com backoff, page-size adaptativa, guard Python 3.12</td>
+</tr>
+<tr class="odd">
+<td>Orquestração</td>
+<td>Um processo Python por tabela (subprocess isolado)</td>
+</tr>
+<tr class="even">
+<td>Auditoria</td>
+<td>Cada execução registra <code>iniciado_em</code>, <code>concluido_em</code> (UTC) e <code>status</code> em <code>meta_etl_execucao</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="tempo-estimado-de-carga">2.5. Tempo estimado de carga</h3>
+<p>Para volumes típicos (alguns milhares de vendas, dezenas de milhares de leads):</p>
+<table>
+<thead>
+<tr class="header">
+<th>Categoria</th>
+<th>Tempo aproximado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Dimensões pequenas (até 100 linhas)</td>
+<td>~12 s cada</td>
+</tr>
+<tr class="even">
+<td>Dimensões médias (100 a 10k)</td>
+<td>~12 a 25 s cada</td>
+</tr>
+<tr class="odd">
+<td>Fatos médios</td>
+<td>~12 a 30 s cada</td>
+</tr>
+<tr class="even">
+<td>Fato grande (<code>f_venda</code>, <code>f_espelho_de_venda</code>)</td>
+<td>~35 s</td>
+</tr>
+<tr class="odd">
+<td><strong>Total típico</strong></td>
+<td><strong>~7 a 10 minutos</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Volumes maiores escalam linearmente devido à paginação adaptativa.</p>
+<h3 id="indicador-atualizado-em-no-dashboard">2.6. Indicador “Atualizado em” no dashboard</h3>
+<p>O Sidebar exibe a data/hora da última execução bem-sucedida do ETL. O endpoint <code>/api/data/etl-status</code> lê a coluna <code>concluido_em</code> (gravada em UTC) da tabela <code>meta_etl_execucao</code> onde <code>status='ok'</code>, e o navegador converte automaticamente para o fuso local do usuário.</p>
+<hr />
+<h2 id="modelo-de-dados-dw_infratecnica">3. Modelo de dados — <code>dw_infratecnica</code></h2>
+<h3 id="modelagem-dimensional-star-schema">3.1. Modelagem dimensional (Star Schema)</h3>
+<p>Cada <strong>fato</strong> representa um evento de negócio (lead, atendimento, visita, venda, descarte) e referencia múltiplas <strong>dimensões</strong> (corretor, empreendimento, campanha, mídia etc.) por suas chaves naturais.</p>
+<h3 id="inventário-de-dimensões-16-tabelas">3.2. Inventário de dimensões (16 tabelas)</h3>
+<p><code>d_cliente_dommus</code>, <code>d_funil</code>, <code>d_etapa_funil</code>, <code>d_fase_funil</code>, <code>d_status_funil</code>, <code>d_etapa_oportunidade</code>, <code>d_fase_etapa</code>, <code>d_origem</code>, <code>d_midia</code>, <code>d_campanha</code>, <code>d_empreendimento</code>, <code>d_equipe</code>, <code>d_corretor</code>, <code>d_gerente</code>, <code>d_usuario</code>, <code>d_usuario_gu</code>.</p>
+<h3 id="inventário-de-fatos-12-tabelas">3.3. Inventário de fatos (12 tabelas)</h3>
+<p><code>f_lead</code>, <code>f_oportunidade</code>, <code>f_atendimento_oportunidade</code>, <code>f_visita</code>, <code>f_descarte</code>, <code>f_funil</code>, <code>f_investimento</code>, <code>f_evolucao_processo</code>, <code>f_historico_etapa_processo</code>, <code>f_unidade</code>, <code>f_espelho_de_venda</code>, <code>f_venda</code> (esta com 121 colunas — proponentes 1/2/3, processo, análise de crédito, banco, venda contabilizada).</p>
+<h3 id="tabela-de-auditoria">3.4. Tabela de auditoria</h3>
+<p><code>meta_etl_execucao</code> — registra cada execução do orquestrador (id, iniciado_em UTC, concluido_em UTC, status, contagens de scripts executados e pulados).</p>
+<h3 id="tipos-de-dados">3.5. Tipos de dados</h3>
+<p>Os tipos são derivados dos comentários <code>-- tipo</code> em cada <code>consulta_*.sql</code>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tipo no comentário</th>
+<th>Tipo MySQL gerado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>-- int</code></td>
+<td><code>BIGINT NULL</code> (suporta IDs grandes do CRM)</td>
+</tr>
+<tr class="even">
+<td><code>-- varchar(N)</code></td>
+<td><code>VARCHAR(N) NULL</code></td>
+</tr>
+<tr class="odd">
+<td><code>-- date</code></td>
+<td><code>DATE NULL</code></td>
+</tr>
+<tr class="even">
+<td><code>-- datetime</code></td>
+<td><code>DATETIME NULL</code></td>
+</tr>
+<tr class="odd">
+<td><code>-- decimal(M,N)</code></td>
+<td><code>DECIMAL(M,N) NULL</code></td>
+</tr>
+<tr class="even">
+<td><code>-- text</code></td>
+<td><code>TEXT NULL</code></td>
+</tr>
+</tbody>
+</table>
+<p>Cada tabela tem <code>KEY idx_&lt;tabela&gt;_&lt;id&gt;</code> na PK natural para acelerar consultas do dashboard.</p>
+<h3 id="charset-e-collation">3.6. Charset e collation</h3>
+<p>Todas as tabelas usam <code>utf8mb4 / utf8mb4_unicode_ci</code> (suporte completo a acentos e emojis em nomes de empreendimentos, descrições etc.).</p>
+<hr />
+<h2 id="dashboard-next.js-em-ambiente-cloud-serverless">4. Dashboard — Next.js em ambiente cloud serverless</h2>
+<h3 id="tecnologia">4.1. Tecnologia</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Camada</th>
+<th>Tecnologia</th>
+<th>Versão</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Framework</td>
+<td>Next.js (App Router)</td>
+<td>14.2.15</td>
+</tr>
+<tr class="even">
+<td>Linguagem</td>
+<td>TypeScript</td>
+<td>5.6.x</td>
+</tr>
+<tr class="odd">
+<td>UI</td>
+<td>Tailwind CSS + Radix UI</td>
+<td>3.4.x</td>
+</tr>
+<tr class="even">
+<td>Gráficos</td>
+<td>Recharts</td>
+<td>2.13.x</td>
+</tr>
+<tr class="odd">
+<td>Auth (Edge)</td>
+<td>jose (JWT verify em middleware)</td>
+<td>5.9.x</td>
+</tr>
+<tr class="even">
+<td>Auth (Node)</td>
+<td>bcryptjs</td>
+<td>2.4.x</td>
+</tr>
+<tr class="odd">
+<td>MySQL client</td>
+<td>mysql2</td>
+<td>3.11.x</td>
+</tr>
+<tr class="even">
+<td>Hospedagem</td>
+<td>Vercel (cloud serverless)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="estrutura">4.2. Estrutura</h3>
+<ul>
+<li><strong>Rotas públicas:</strong> <code>/login</code></li>
+<li><strong>Rotas protegidas (middleware):</strong> <code>/dashboard/*</code>, <code>/api/data/*</code></li>
+<li><strong>Páginas:</strong>
+<ul>
+<li><code>/dashboard/vendas</code> (sub-abas Visão Atual / Funil de Venda — 5 etapas)</li>
+<li><code>/dashboard/estoque</code></li>
+<li><code>/dashboard/visitas</code></li>
+<li><code>/dashboard/lead</code> (sub-abas Visão Geral / Funil de Investimento)</li>
+</ul></li>
+<li><strong>APIs de autenticação:</strong> <code>/api/auth/login</code>, <code>/api/auth/logout</code></li>
+<li><strong>APIs de dados:</strong>
+<ul>
+<li><code>/api/data/vendas</code></li>
+<li><code>/api/data/funil-venda</code></li>
+<li><code>/api/data/estoque</code></li>
+<li><code>/api/data/visitas</code></li>
+<li><code>/api/data/oportunidade</code></li>
+<li><code>/api/data/funil</code></li>
+<li><code>/api/data/cliente</code></li>
+<li><code>/api/data/etl-status</code></li>
+</ul></li>
+</ul>
+<h3 id="conexão-com-o-dw">4.3. Conexão com o DW</h3>
+<p>Cada chamada a <code>/api/data/*</code> abre conexão MySQL via pool (<code>mysql2</code>) com o <code>dw_infratecnica</code>. O pool é guardado em <code>globalThis</code> para reuso dentro da mesma function serverless.</p>
+<h3 id="identidade-visual">4.4. Identidade visual</h3>
+<p>O Sidebar carrega logo e nome do cliente dinamicamente da tabela <code>d_cliente_dommus</code> (via <code>/api/data/cliente</code>). A logo “Grupo Infratécnica” é fornecida pelo próprio cliente e armazenada no DW.</p>
+<hr />
+<h2 id="segurança-e-gestão-de-credenciais">5. Segurança e gestão de credenciais</h2>
+<h3 id="princípios">5.1. Princípios</h3>
+<ol type="1">
+<li><strong>Credenciais nunca ficam no código.</strong> Senhas, tokens e secrets ficam em arquivos não versionados (<code>.env.local</code>, <code>.streamlit/secrets.toml</code>) que estão no <code>.gitignore</code>.</li>
+<li><strong>Separação por ambiente.</strong> Dev/local usa arquivos próprios; produção (Vercel) usa Environment Variables encriptadas.</li>
+<li><strong>Princípio do menor privilégio.</strong> O dashboard só faz <code>SELECT</code> no DW.</li>
+<li><strong>Senhas de usuário com hash.</strong> Tabela <code>d_usuario_gu</code> armazena hashes bcrypt (custo 10).</li>
+<li><strong>JWT com expiração.</strong> Cookie <code>dommus_session</code> é httpOnly, secure (em prod), TTL 24 h, assinado HS256 com <code>JWT_SECRET</code> aleatório de 64 bytes.</li>
+</ol>
+<h3 id="onde-ficam-as-credenciais">5.2. Onde ficam as credenciais</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Credencial</th>
+<th>Local (DEV)</th>
+<th>Local (PRODUÇÃO)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Senha do MySQL DW</td>
+<td><code>.env.local</code> (não commitado)</td>
+<td>Environment Variables na Vercel</td>
+</tr>
+<tr class="even">
+<td><code>JWT_SECRET</code></td>
+<td><code>.env.local</code></td>
+<td>Environment Variables na Vercel</td>
+</tr>
+<tr class="odd">
+<td>Credenciais do CRM origem (ETL)</td>
+<td><code>etl/pipeline/.streamlit/secrets.toml</code> (não commitado)</td>
+<td>N/A (ETL roda só local)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="proteção-do-código-fonte">5.3. Proteção do código-fonte</h3>
+<ul>
+<li>Repositório GitHub <strong>privado</strong>: <code>github.com/klingerlima23-hub/dommus-bi-infratecnica</code></li>
+<li><code>.gitignore</code> cobre: <code>node_modules/</code>, <code>.next/</code>, <code>.env*</code>, <code>**/secrets.toml</code>, <code>__pycache__/</code>, <code>*.pyc</code>, <code>.pipeline_state.json</code></li>
+</ul>
+<h3 id="segurança-do-banco-de-dados">5.4. Segurança do banco de dados</h3>
+<ul>
+<li>O DW MySQL na AWS (<code>18.209.74.87:3310</code>) está atrás de um Security Group que aceita conexões apenas de:
+<ol type="1">
+<li>IPs específicos da rede Dommus (para o ETL local)</li>
+<li>IPs de egress da Vercel (para o dashboard em produção)</li>
+</ol></li>
+<li>Nenhum acesso <code>0.0.0.0/0</code> (banco não é público).</li>
+</ul>
+<hr />
+<h2 id="separação-de-ambientes">6. Separação de ambientes</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Componente</th>
+<th>Onde roda</th>
+<th>Acessa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ETL</strong></td>
+<td>Servidor local Dommus (Python 3.12)</td>
+<td>CRM origem (RDS) + DW destino (RDS)</td>
+</tr>
+<tr class="even">
+<td><strong>DW</strong></td>
+<td>AWS RDS MySQL</td>
+<td>(só recebe escritas do ETL e leituras do dashboard)</td>
+</tr>
+<tr class="odd">
+<td><strong>Dashboard</strong></td>
+<td>Vercel (Hobby plan)</td>
+<td>DW destino (RDS)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implicação prática:</strong> - O ETL <strong>não depende</strong> do dashboard estar no ar - O dashboard <strong>não depende</strong> do ETL estar rodando - Falha em qualquer um dos três não derruba os outros</p>
+<h2 id="solicitações-histórico-de-alterações">7. Solicitações — histórico de alterações</h2>
+<p>Esta seção lista todas as solicitações de mudança feitas pelo cliente (Infratécnica) ou pelo time Dommus que impactaram o comportamento do produto. Cada entrada registra a data, o autor, o pedido original e o que foi implementado.</p>
+<h3 id="cr-001-migração-do-dashboard-streamlit-para-next.js">CR-001 — Migração do dashboard Streamlit para Next.js</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data</strong></td>
+<td>27/05/2026</td>
+</tr>
+<tr class="even">
+<td><strong>Solicitante</strong></td>
+<td>Dommus (interno)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo</strong></td>
+<td>Refatoração arquitetural</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pedido:</strong> modernizar o dashboard Infratécnica, substituindo o Streamlit (v001) por Next.js + Tailwind + Recharts, mantendo a lógica de negócio idêntica e seguindo o padrão da BNR V1.</p>
+<p><strong>Implementação:</strong> - Cópia dos componentes, paleta, layout e páginas do projeto BNR V1. - Logo Infratécnica e identidade visual preservadas (<code>public/logo/logo_infratecnica.png</code>). - APIs <code>src/app/api/data/*</code> e queries SQL mantidas com adaptações para o modelo Infratécnica. - Endpoint <code>/api/data/etl-status</code> adicionado para suportar o indicador “Atualizado em” no Sidebar.</p>
+<h3 id="cr-002-pipeline-de-auditoria-do-etl">CR-002 — Pipeline de auditoria do ETL</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data</strong></td>
+<td>27/05/2026</td>
+</tr>
+<tr class="even">
+<td><strong>Solicitante</strong></td>
+<td>Dommus (interno)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo</strong></td>
+<td>Funcionalidade</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pedido:</strong> o Sidebar exibia “Atualizado em —” porque a tabela <code>meta_etl_execucao</code> não existia e o pipeline não registrava execuções.</p>
+<p><strong>Implementação:</strong> - Adicionada a DDL da <code>meta_etl_execucao</code> em <code>etl/pipeline/criar_dw_infratecnica.sql</code>. - Adicionadas as funções <code>_meta_etl_ensure_table</code>, <code>_meta_etl_inicio</code> e <code>_meta_etl_fim</code> no orquestrador <code>etl_inquilino_0040_infratecnica_executa_pipeline.py</code>. - Cada execução do ETL agora registra início e fim em UTC, e o Sidebar mostra o timestamp convertido para o fuso do navegador.</p>
+<h3 id="cr-003-card-vendida-na-aba-estoque">CR-003 — Card “VENDIDA” na aba Estoque</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data</strong></td>
+<td>28/05/2026</td>
+</tr>
+<tr class="even">
+<td><strong>Solicitante</strong></td>
+<td>Camila (cliente Infratécnica)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo</strong></td>
+<td>Regra de negócio</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pedido (literal):</strong> <em>“VENDIDA é toda e qualquer unidade que estiver nos quadros Vermelho, Azul, Registro (roxo) e esse (verdinho) = vendida (cliente não registrado). Pode corrigir?”</em></p>
+<p><strong>Mapeamento de códigos:</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Cor</th>
+<th>Código</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Vermelho</td>
+<td>V</td>
+<td>VENDIDA</td>
+</tr>
+<tr class="even">
+<td>Azul</td>
+<td>A</td>
+<td>ASSINADA NO BANCO</td>
+</tr>
+<tr class="odd">
+<td>Roxo</td>
+<td>S</td>
+<td>REGISTRADA</td>
+</tr>
+<tr class="even">
+<td>Verde claro</td>
+<td>X</td>
+<td>VENDIDA (cliente não registrado)</td>
+</tr>
+<tr class="odd">
+<td>Verde escuro</td>
+<td>D</td>
+<td>DISPONÍVEL PARA VENDA</td>
+</tr>
+<tr class="even">
+<td>—</td>
+<td>R</td>
+<td>RESERVADA</td>
+</tr>
+<tr class="odd">
+<td>—</td>
+<td>B</td>
+<td>RESERVA TÉCNICA</td>
+</tr>
+<tr class="even">
+<td>—</td>
+<td>I</td>
+<td>INDISPONÍVEL PARA VENDA</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implementação:</strong> - <code>src/app/api/data/estoque/route.ts</code>: adicionada a coluna <code>disponibilidade</code> (código de uma letra) no <code>SELECT</code>. - <code>src/app/dashboard/estoque/page.tsx</code>: função <code>classificarStatus()</code> reescrita para classificar pelo código (mais robusto): - V, X, A, S → <strong>VENDIDA</strong> - D → <strong>DISPONIVEL</strong> - R, B → <strong>RESERVA</strong> - demais (I e outros) → <strong>OUTROS</strong> - O card “Registrada” foi mantido na interface (mostra 0 — todas as S foram migradas para VENDIDA). - A mesma classificação se aplica ao gráfico de pizza “Distribuição por Status”.</p>
+<h3 id="cr-004-bug-card-venda-zerado-na-aba-vendas-funil-de-venda">CR-004 — Bug: card VENDA zerado na aba Vendas → Funil de Venda</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data</strong></td>
+<td>28/05/2026</td>
+</tr>
+<tr class="even">
+<td><strong>Solicitante</strong></td>
+<td>Klinger Lima (interno)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo</strong></td>
+<td>Bug</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pedido:</strong> o card “VENDA” do Funil de Venda exibia 0 mesmo com etapas anteriores (Cadastro 82, Pastas 22, Aprovado IF 32, Contrato 18) não zeradas.</p>
+<p><strong>Causa raiz:</strong> a API <code>/api/data/funil-venda</code> ignorava a coluna real <code>venda_contabilizado_em</code> da tabela <code>f_venda</code> (populada pelo ETL via <code>tb_venda.contabilizado_em</code> do CRM). Em vez disso, inferia a venda pela flag <code>processo_unidade_id &gt; 0 AND processo_data_venda IS NOT NULL</code>, regra que não casava no modelo de dados Infratécnica.</p>
+<p><strong>Implementação:</strong> - <code>src/app/api/data/funil-venda/route.ts</code>: passou a selecionar <code>v.venda_contabilizado_em</code> diretamente da <code>f_venda</code>. - A flag <code>is_venda</code> agora é derivada como <code>CASE WHEN v.venda_contabilizado_em IS NOT NULL THEN 1 ELSE 0 END</code>.</p>
+<h3 id="cr-005-join-com-d_campanha-em-apidataoportunidade">CR-005 — JOIN com <code>d_campanha</code> em <code>/api/data/oportunidade</code></h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data</strong></td>
+<td>28/05/2026</td>
+</tr>
+<tr class="even">
+<td><strong>Solicitante</strong></td>
+<td>Klinger Lima (interno)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo</strong></td>
+<td>Funcionalidade</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pedido:</strong> o gráfico de rosca “Oportunidades por Campanhas” da aba Lead mostrava “Sem campanha” para 100% das oportunidades.</p>
+<p><strong>Implementação:</strong> - <code>src/app/api/data/oportunidade/route.ts</code>: adicionado <code>LEFT JOIN d_campanha cmp ON o.id_campanha = cmp.id_campanha</code> direto (sem necessidade do passo intermediário via <code>f_lead</code> que o BNR usa, porque o modelo Infratécnica já tem <code>id_campanha</code> denormalizado em `f_opor</p>
+</body>
+</html>

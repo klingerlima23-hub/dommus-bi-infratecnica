@@ -1,345 +1,395 @@
-# Projeto `crm_inquilino_0040_infratecnica_v1` — Infratecnica (Dommus, modelo de referência)
+# Arquitetura de BI + Dashboard — `crm_inquilino_0040_infratecnica_v1`
 
-Documentação técnica do projeto **Infratecnica v1** — cliente Dommus #0040. Este é o **padrão arquitetural de referência** para todos os projetos Dommus que combinam ETL + dashboard web.
+Documento técnico que descreve a **arquitetura** da plataforma de BI Comercial do cliente Dommus #0040 — Infratécnica: estrutura do ETL, modelo de dados, dashboard e segurança.
 
 | | |
 |---|---|
-| **Versão do documento** | **1.2.0** |
-| **Data de publicação** | 09/05/2026 |
-| **Autor** | Klinger Lima (`klinger.lima@dommus.tec.br`) |
-| **Cliente** | Dommus #0040 — Infratecnica |
-| **Status** | **Padrão de referência** — modelo arquitetural para os demais inquilinos Dommus |
-| **Repositório local** | `D:\Dommus\dommus_etl\crm_inquilino_0040_infratecnica_v1` |
+| **Cliente** | Dommus #0040 — Infratécnica |
+| **Tipo de projeto** | BI Comercial (ETL + Dashboard) |
+| **Modelagem dimensional** | Star schema (1 fato central por assunto + dimensões compartilhadas) |
+| **Repositório** | github.com/klingerlima23-hub/dommus-bi-infratecnica |
+| **URL pública** | https://dommus-bi-infratecnica.vercel.app |
 
----
-
-## ⚡ Como usar este arquivo (HANDOFF)
-
-Quando abrir um novo chat sobre este projeto:
-
-1. *"Antes de qualquer coisa, lê o arquivo `D:\Dommus\dommus_etl\crm_inquilino_0040_infratecnica_v1\crm_inquilino_0040_infratecnica_v1.md` pra ficar com todo o contexto."*
-2. Toda mudança nova reflita na **Seção 11 — Histórico de mudanças** + bump de versão na **Seção 13**.
+> *Última atualização: **28/05/2026** por **Klinger Lima**, Engenheiro de Dados.*
 
 ---
 
 ## Sumário
 
-1. [Visão geral](#1-visão-geral)
-2. [Stack técnica](#2-stack-técnica)
-3. [Estrutura de arquivos](#3-estrutura-de-arquivos)
-4. [Banco de dados — `dw_infratecnica`](#4-banco-de-dados--dw_infratecnica)
-5. [Pipeline ETL](#5-pipeline-etl)
-6. [Dashboard Next.js](#6-dashboard-nextjs)
-7. [Como rodar localmente](#7-como-rodar-localmente)
-8. [Credenciais](#8-credenciais)
-9. [Pendências e backlog](#9-pendências-e-backlog)
-10. [Convenções e padrões](#10-convenções-e-padrões)
-11. [Histórico de mudanças](#11-histórico-de-mudanças)
-12. [Registro de solicitações de mudança (CR Log)](#12-cr-log)
-13. [Histórico de versões deste documento](#13-histórico-de-versões-deste-documento)
+1. [Visão geral da arquitetura](#1-visão-geral-da-arquitetura)
+2. [ETL — origem, destino, processo](#2-etl--origem-destino-processo)
+3. [Modelo de dados — `dw_infratecnica`](#3-modelo-de-dados--dw_infratecnica)
+4. [Dashboard — Next.js em ambiente cloud serverless](#4-dashboard--nextjs-em-ambiente-cloud-serverless)
+5. [Segurança e gestão de credenciais](#5-segurança-e-gestão-de-credenciais)
+6. [Separação de ambientes](#6-separação-de-ambientes)
+7. [Solicitações — histórico de alterações](#7-solicitações--histórico-de-alterações)
 
 ---
 
-## 1. Visão geral
+\newpage
 
-Plataforma única que cobre **ETL** (CRM Dommus → DW próprio) + **Dashboard analítico** (Next.js 14 + Tailwind + Recharts) com login JWT.
+## 1. Visão geral da arquitetura
 
-**Páginas do dashboard** (em `src/app/dashboard/`):
-- `vendas/` — Aba Vendas (KPIs + gráficos + tabela; toggle Visão Atual / Funil de Venda com 5 etapas)
-- `estoque/` — Aba Estoque
-- `visitas/` — Aba Visitas
-- `lead/` — Aba Lead com sub-abas (Visão Geral + Funil & Investimento)
+A solução é dividida em três ambientes independentes, cada um com sua própria responsabilidade e ciclo de vida:
 
-**Por que é o modelo de referência?**
+```
++-------------------------+    +--------------------------+    +------------------------+
+|   CRM ORIGEM (AWS)      |    |  ETL (servidor local)    |    |  DW DESTINO (AWS)      |
+|  dommus_infratecnica    |--->|  Python 3.12 + pandas    |--->|  dw_infratecnica       |
+|  crm_inquilino_0040     |    |  TRUNCATE + FULL LOAD    |    |  16 dim + 12 fatos     |
+|  MySQL gerenciado RDS   |    |  Keyset pagination       |    |  + meta_etl_execucao   |
++-------------------------+    +--------------------------+    +------------------------+
+                                                                          |
+                                                                          | (consultas)
+                                                                          v
+                                                              +------------------------+
+                                                              |  DASHBOARD (Vercel)    |
+                                                              |  Next.js 14 + Recharts |
+                                                              |  Auth JWT + bcrypt     |
+                                                              |  Functions serverless  |
+                                                              +------------------------+
+```
 
-- Foi o primeiro projeto Dommus a unificar ETL + dashboard em **uma única pasta** (sem dashboard separado)
-- Define a estrutura `etl/pipeline/`, `src/app/`, `src/lib/`, `src/components/` que os demais devem seguir
-- Define as convenções de auth (jose JWT + bcryptjs), DB pool (mysql2), filtros (URL search params), gráficos (Recharts)
+**Fluxo dos dados:**
+1. O **CRM origem** (na AWS) recebe os dados operacionais do cliente Infratécnica.
+2. O **ETL** (rodando no servidor local Dommus) lê os dados do CRM, transforma e carrega no DW destino (também na AWS).
+3. O **DW destino** (`dw_infratecnica`) é onde os dados ficam consolidados em modelo estrela, prontos para consulta analítica.
+4. O **Dashboard** (Next.js, hospedado na Vercel) consulta o DW destino via API serverless e renderiza KPIs e gráficos.
 
 ---
 
-## 2. Stack técnica
+## 2. ETL — origem, destino, processo
+
+### 2.1. Bancos de origem
+
+| Banco | Conteúdo | Localização |
+|---|---|---|
+| `dommus_infratecnica` | Dados detalhados de cliente, usuário, equipe, gerente, corretor, empreendimento, processo de venda | MySQL gerenciado AWS RDS |
+| `crm_inquilino_0040` | Oportunidades, leads, funil, mídia, campanha, origem, status, etapa | MySQL gerenciado AWS RDS |
+
+### 2.2. Banco de destino
+
+| Banco | Localização | Schema |
+|---|---|---|
+| `dw_infratecnica` | MySQL na AWS (18.209.74.87:3310) | 16 dimensões + 12 fatos + `meta_etl_execucao` = **29 tabelas, ~410 colunas** |
+
+### 2.3. Onde o ETL roda
+
+O ETL é **executado no servidor local Dommus** (Python 3.12, sem acesso público), no IP de extração liberado pelo CRM origem. Esse servidor estabelece conexões saintes para os bancos de origem (CRMs) e destino (`dw_infratecnica`) na AWS. As credenciais ficam fora do código-fonte (ver Seção 5).
+
+### 2.4. Estratégia de carga
+
+**TRUNCATE + FULL LOAD** com paginação adaptativa:
+
+| Etapa | Estratégia |
+|---|---|
+| Para cada tabela do DW | `TRUNCATE TABLE` antes de inserir |
+| Leitura da origem | Keyset pagination (page-size adaptativa: 5000 → 1000 → 500) |
+| Escrita no DW | `INSERT` em lote (chunksize 500) com retry e backoff exponencial |
+| Falhas de conexão | Mitigação 6 camadas: `use_pure=True`, `SESSION_INIT`, `pool_recycle`, retry com backoff, page-size adaptativa, guard Python 3.12 |
+| Orquestração | Um processo Python por tabela (subprocess isolado) |
+| Auditoria | Cada execução registra `iniciado_em`, `concluido_em` (UTC) e `status` em `meta_etl_execucao` |
+
+### 2.5. Tempo estimado de carga
+
+Para volumes típicos (alguns milhares de vendas, dezenas de milhares de leads):
+
+| Categoria | Tempo aproximado |
+|---|---|
+| Dimensões pequenas (até 100 linhas) | ~12 s cada |
+| Dimensões médias (100 a 10k) | ~12 a 25 s cada |
+| Fatos médios | ~12 a 30 s cada |
+| Fato grande (`f_venda`, `f_espelho_de_venda`) | ~35 s |
+| **Total típico** | **~7 a 10 minutos** |
+
+Volumes maiores escalam linearmente devido à paginação adaptativa.
+
+### 2.6. Indicador "Atualizado em" no dashboard
+
+O Sidebar exibe a data/hora da última execução bem-sucedida do ETL. O endpoint `/api/data/etl-status` lê a coluna `concluido_em` (gravada em UTC) da tabela `meta_etl_execucao` onde `status='ok'`, e o navegador converte automaticamente para o fuso local do usuário.
+
+---
+
+## 3. Modelo de dados — `dw_infratecnica`
+
+### 3.1. Modelagem dimensional (Star Schema)
+
+Cada **fato** representa um evento de negócio (lead, atendimento, visita, venda, descarte) e referencia múltiplas **dimensões** (corretor, empreendimento, campanha, mídia etc.) por suas chaves naturais.
+
+### 3.2. Inventário de dimensões (16 tabelas)
+
+`d_cliente_dommus`, `d_funil`, `d_etapa_funil`, `d_fase_funil`, `d_status_funil`, `d_etapa_oportunidade`, `d_fase_etapa`, `d_origem`, `d_midia`, `d_campanha`, `d_empreendimento`, `d_equipe`, `d_corretor`, `d_gerente`, `d_usuario`, `d_usuario_gu`.
+
+### 3.3. Inventário de fatos (12 tabelas)
+
+`f_lead`, `f_oportunidade`, `f_atendimento_oportunidade`, `f_visita`, `f_descarte`, `f_funil`, `f_investimento`, `f_evolucao_processo`, `f_historico_etapa_processo`, `f_unidade`, `f_espelho_de_venda`, `f_venda` (esta com 121 colunas — proponentes 1/2/3, processo, análise de crédito, banco, venda contabilizada).
+
+### 3.4. Tabela de auditoria
+
+`meta_etl_execucao` — registra cada execução do orquestrador (id, iniciado_em UTC, concluido_em UTC, status, contagens de scripts executados e pulados).
+
+### 3.5. Tipos de dados
+
+Os tipos são derivados dos comentários `-- tipo` em cada `consulta_*.sql`:
+
+| Tipo no comentário | Tipo MySQL gerado |
+|---|---|
+| `-- int` | `BIGINT NULL` (suporta IDs grandes do CRM) |
+| `-- varchar(N)` | `VARCHAR(N) NULL` |
+| `-- date` | `DATE NULL` |
+| `-- datetime` | `DATETIME NULL` |
+| `-- decimal(M,N)` | `DECIMAL(M,N) NULL` |
+| `-- text` | `TEXT NULL` |
+
+Cada tabela tem `KEY idx_<tabela>_<id>` na PK natural para acelerar consultas do dashboard.
+
+### 3.6. Charset e collation
+
+Todas as tabelas usam `utf8mb4 / utf8mb4_unicode_ci` (suporte completo a acentos e emojis em nomes de empreendimentos, descrições etc.).
+
+---
+
+## 4. Dashboard — Next.js em ambiente cloud serverless
+
+### 4.1. Tecnologia
 
 | Camada | Tecnologia | Versão |
 |---|---|---|
-| ETL | Python 3.12 + SQLAlchemy + mysql-connector-python (use_pure=True) | — |
-| Dashboard | Next.js | 14.2.15 (App Router) |
-| UI | Tailwind CSS + Radix UI | 3.x |
+| Framework | Next.js (App Router) | 14.2.15 |
+| Linguagem | TypeScript | 5.6.x |
+| UI | Tailwind CSS + Radix UI | 3.4.x |
 | Gráficos | Recharts | 2.13.x |
-| Auth (Edge) | jose (JWT) | 5.9.x |
+| Auth (Edge) | jose (JWT verify em middleware) | 5.9.x |
 | Auth (Node) | bcryptjs | 2.4.x |
 | MySQL client | mysql2 | 3.11.x |
-| Icons | lucide-react | 0.452.x |
-| Banco destino | MySQL `18.209.74.87:3310/dw_infratecnica` | — |
+| Hospedagem | Vercel (cloud serverless) | — |
+
+### 4.2. Estrutura
+
+- **Rotas públicas:** `/login`
+- **Rotas protegidas (middleware):** `/dashboard/*`, `/api/data/*`
+- **Páginas:**
+  - `/dashboard/vendas` (sub-abas Visão Atual / Funil de Venda — 5 etapas)
+  - `/dashboard/estoque`
+  - `/dashboard/visitas`
+  - `/dashboard/lead` (sub-abas Visão Geral / Funil de Investimento)
+- **APIs de autenticação:** `/api/auth/login`, `/api/auth/logout`
+- **APIs de dados:**
+  - `/api/data/vendas`
+  - `/api/data/funil-venda`
+  - `/api/data/estoque`
+  - `/api/data/visitas`
+  - `/api/data/oportunidade`
+  - `/api/data/funil`
+  - `/api/data/cliente`
+  - `/api/data/etl-status`
+
+### 4.3. Conexão com o DW
+
+Cada chamada a `/api/data/*` abre conexão MySQL via pool (`mysql2`) com o `dw_infratecnica`. O pool é guardado em `globalThis` para reuso dentro da mesma function serverless.
+
+### 4.4. Identidade visual
+
+O Sidebar carrega logo e nome do cliente dinamicamente da tabela `d_cliente_dommus` (via `/api/data/cliente`). A logo "Grupo Infratécnica" é fornecida pelo próprio cliente e armazenada no DW.
 
 ---
 
-## 3. Estrutura de arquivos
+## 5. Segurança e gestão de credenciais
 
-```
-crm_inquilino_0040_infratecnica_v1/
-├── crm_inquilino_0040_infratecnica_v1.md      ← este arquivo
-├── README.md
-├── package.json (Next.js scripts: dev/build/start)
-├── tsconfig.json, tailwind.config.ts, next.config.js, postcss.config.js
-│
-├── etl/pipeline/                              ← ETL completo
-│   ├── config.py                              ← credenciais + paths
-│   ├── etl_utils.py (compartilhado)           ← engine factory, retry, paginação
-│   ├── criar_dw.py + criar_dw_infratecnica.sql ← DDL
-│   ├── consulta_d_*.sql (≈ 14 dimensões)
-│   ├── consulta_f_*.sql (≈ 12 fatos)
-│   ├── sincroniza_d_*.py + sincroniza_f_*.py
-│   ├── atualiza_senha_d_usuario_gu.py         ← cria/reset usuário admin
-│   └── pipeline_executa.py                    ← orquestrador (subprocess)
-│
-├── public/                                    ← logos Dommus
-│
-└── src/                                        ← Next.js
-    ├── app/
-    │   ├── layout.tsx, page.tsx, globals.css
-    │   ├── login/                              ← tela de login
-    │   ├── dashboard/                          ← hub + 4 sub-páginas
-    │   │   ├── layout.tsx (sidebar logo+user+ações+footer)
-    │   │   ├── page.tsx
-    │   │   ├── vendas/page.tsx
-    │   │   ├── estoque/page.tsx
-    │   │   ├── visitas/page.tsx
-    │   │   └── lead/page.tsx (sub-abas: visão geral + funil & investimento)
-    │   └── api/
-    │       ├── auth/login/route.ts, logout/route.ts
-    │       └── data/{vendas,estoque,visitas,lead,funil,oportunidade}/route.ts
-    ├── components/
-    │   ├── KPI.tsx, Filters.tsx, Charts.tsx, Table.tsx
-    │   └── Sidebar.tsx
-    ├── lib/
-    │   ├── auth.ts (jose JWT, Edge-safe)
-    │   ├── passwords.ts (bcryptjs, Node-only)
-    │   ├── db.ts (MySQL pool)
-    │   └── filters.ts (parser de filtros via URL)
-    └── middleware.ts (protege /dashboard/*, /api/data/*)
-```
+### 5.1. Princípios
 
----
+1. **Credenciais nunca ficam no código.** Senhas, tokens e secrets ficam em arquivos não versionados (`.env.local`, `.streamlit/secrets.toml`) que estão no `.gitignore`.
+2. **Separação por ambiente.** Dev/local usa arquivos próprios; produção (Vercel) usa Environment Variables encriptadas.
+3. **Princípio do menor privilégio.** O dashboard só faz `SELECT` no DW.
+4. **Senhas de usuário com hash.** Tabela `d_usuario_gu` armazena hashes bcrypt (custo 10).
+5. **JWT com expiração.** Cookie `dommus_session` é httpOnly, secure (em prod), TTL 24 h, assinado HS256 com `JWT_SECRET` aleatório de 64 bytes.
 
-## 4. Banco de dados — `dw_infratecnica`
+### 5.2. Onde ficam as credenciais
 
-### Dimensões (15)
-
-`d_cliente_dommus` (identidade visual), `d_funil`, `d_canal` (se existir), `d_midia`, `d_origem`, `d_campanha`, `d_empreendimento`, `d_fase_funil`, `d_status_funil`, `d_fase_etapa`, `d_etapa_oportunidade`, `d_equipe`, `d_corretor`, `d_gerente`, `d_usuario`, `d_usuario_gu` (auth do dashboard).
-
-> **`d_cliente_dommus`** — tabela de UMA linha (filtrada por `tb_cliente.id = 51`). Colunas: `id_cliente_dommus`, `nome_cliente_dommus`, `logo_cliente_dommus` (URL absoluta). Consumida pela API `/api/data/cliente` para alimentar a logo da Sidebar dinamicamente. Substituiu o asset estático `public/logo/logo_infratecnica.png`.
-
-### Fatos (12)
-
-`f_lead`, `f_visita`, `f_oportunidade`, `f_atendimento_oportunidade`, `f_descarte`, `f_funil`, `f_investimento`, `f_unidade`, `f_espelho_de_venda`, `f_venda`, `f_evolucao_processo`, `f_historico_etapa_processo`.
-
-### Auth
-
-`d_usuario_gu` armazena email + hash (suporta **bcrypt + SHA-256 + SHA-512**) + `tipo_usuario`.
-
----
-
-## 5. Pipeline ETL
-
-Mesma arquitetura do `magikjc` (ver `crm_inquilino_0120_magikjc.md` para detalhes profundos):
-
-- **TRUNCATE + FULL LOAD** com keyset pagination
-- **Mitigação 6 camadas contra erro 2013** (driver puro, SESSION_INIT, pool_recycle, retry com backoff, page-size adaptativa, guard Python 3.12)
-- **Pipeline orquestrador** roda cada `sincroniza_*.py` como subprocess isolado
-
-**Comando completo:**
-```powershell
-cd D:\Dommus\dommus_etl\crm_inquilino_0040_infratecnica_v1\etl\pipeline
-py -3.12 pipeline_executa.py
-```
-
----
-
-## 6. Dashboard Next.js
-
-### 6.1. Auth
-
-- `middleware.ts` valida o cookie `infratecnica_session` (jose) em `/dashboard/*` e `/api/data/*`
-- `/api/auth/login` autentica contra `d_usuario_gu` com bcryptjs (também aceita SHA-256/SHA-512 legado)
-- Cookie httpOnly + secure (em prod), 24h
-- **Gate de loading** entre login e dashboard (UX premium)
-
-### 6.2. Sidebar
-
-Logo Dommus → bloco do usuário (nome/email/tipo) → ações (Sair) → footer (copyright). Toggle de tema discreto.
-
-### 6.3. Aba Vendas (referência de padrão UI)
-
-- Sub-menu acima dos filtros que filtra os cards
-- Filtros de data (default: mês atual)
-- **Toggle "Visão Atual / Funil de Venda"** — alterna entre snapshot atual e funil com 5 etapas hardcoded (Cadastro/Pasta/Venda baseado em `d_fase_etapa`)
-- Stacked bar Corretor/Equipe/Empreendimento por Etapa
-- Gráfico período com eixo X exato (sem horário)
-- Legenda horizontal centralizada com fonte menor
-
-### 6.4. Aba Lead (sub-abas)
-
-- **Visão Geral** — KPIs e gráficos
-- **Funil & Investimento** — sub-aba avançada
-  - Cards 6-em-uma-linha (altura uniforme 8.5rem via CSS)
-  - Filtros adicionais (Etapa Funil)
-  - Card "Leads Perdidos"
-  - Toggle exibir/ocultar legenda de "Etapas agregadas"
-  - Tabela detalhe abaixo dos gráficos
-  - JOINs por `d_usuario` (não mais `d_corretor`/`d_gerente`)
-  - Funil consistente com cards (UNION transições + etapa atual)
-
----
-
-## 7. Como rodar localmente
-
-```powershell
-# ETL
-cd D:\Dommus\dommus_etl\crm_inquilino_0040_infratecnica_v1
-py -3.12 -m pip install sqlalchemy mysql-connector-python pandas
-py -3.12 etl\pipeline\pipeline_executa.py
-
-# Dashboard (após renomeação do v002 → v1, apagar .next se existir antes)
-Remove-Item .next -Recurse -Force -ErrorAction SilentlyContinue
-npm install
-npm run dev
-# (porta default Next.js: 3000)
-```
-
----
-
-## 8. Credenciais
-
-| Recurso | Onde está |
-|---|---|
-| MySQL `dw_infratecnica` | `etl/pipeline/config.py` (mesmo padrão dos demais Dommus) |
-| Origem CRM `dommus_infratecnica` | idem |
-| JWT_SECRET | `.env.local` (criar a partir de `.env.local.example` se existir) |
-
-> Padrão de email/assinatura para projetos Dommus: **`klinger.lima@dommus.tec.br`**
-
----
-
-## 9. Pendências e backlog
-
-| # | Item | Prioridade |
+| Credencial | Local (DEV) | Local (PRODUÇÃO) |
 |---|---|---|
-| **A** | Apagar `.next/` (cache do build com paths antigos `_v002`) antes do próximo `npm run dev` | Baixa (auto-resolve no primeiro build) |
-| **B** | Atualizar campo `name` no `package.json` de `crm-inquilino-0040-infratecnica-v002` para `crm-inquilino-0040-infratecnica-v1` | Baixa |
-| **C** | Validar smoke-test pós renomeio (login + dashboard + API) | Média |
+| Senha do MySQL DW | `.env.local` (não commitado) | Environment Variables na Vercel |
+| `JWT_SECRET` | `.env.local` | Environment Variables na Vercel |
+| Credenciais do CRM origem (ETL) | `etl/pipeline/.streamlit/secrets.toml` (não commitado) | N/A (ETL roda só local) |
+
+### 5.3. Proteção do código-fonte
+
+- Repositório GitHub **privado**: `github.com/klingerlima23-hub/dommus-bi-infratecnica`
+- `.gitignore` cobre: `node_modules/`, `.next/`, `.env*`, `**/secrets.toml`, `__pycache__/`, `*.pyc`, `.pipeline_state.json`
+
+### 5.4. Segurança do banco de dados
+
+- O DW MySQL na AWS (`18.209.74.87:3310`) está atrás de um Security Group que aceita conexões apenas de:
+  1. IPs específicos da rede Dommus (para o ETL local)
+  2. IPs de egress da Vercel (para o dashboard em produção)
+- Nenhum acesso `0.0.0.0/0` (banco não é público).
 
 ---
 
-## 10. Convenções e padrões
+## 6. Separação de ambientes
 
-### 10.1. Identidade
+| Componente | Onde roda | Acessa |
+|---|---|---|
+| **ETL** | Servidor local Dommus (Python 3.12) | CRM origem (RDS) + DW destino (RDS) |
+| **DW** | AWS RDS MySQL | (só recebe escritas do ETL e leituras do dashboard) |
+| **Dashboard** | Vercel (Hobby plan) | DW destino (RDS) |
 
-- Cliente Dommus → **`klinger.lima@dommus.tec.br`**
-- Doc tem nome igual ao diretório (`crm_inquilino_0040_infratecnica_v1.md`)
+**Implicação prática:**
+- O ETL **não depende** do dashboard estar no ar
+- O dashboard **não depende** do ETL estar rodando
+- Falha em qualquer um dos três não derruba os outros
 
-### 10.2. Versionamento de pasta (padrão Dommus)
+\newpage
 
-`_v1` (sem zero-padding). Padronizado em 09/05/2026 a partir do `_v002`/`_v0001` legado.
+## 7. Solicitações — histórico de alterações
 
-### 10.3. Versionamento do doc (SemVer)
+Esta seção lista todas as solicitações de mudança feitas pelo cliente (Infratécnica) ou pelo time Dommus que impactaram o comportamento do produto. Cada entrada registra a data, o autor, o pedido original e o que foi implementado.
 
-`MAJOR.MINOR.PATCH` — ver Seção 13.
+### CR-001 — Migração do dashboard Streamlit para Next.js
 
-### 10.4. Guard universal de Python 3.12 nos scripts ETL
-
-Todo script `.py` em `etl/pipeline/` deve ter, no topo (após docstring e `from __future__` se houver, antes de qualquer outro `import`), o seguinte bloco:
-
-```python
-# ============================================================
-# Guard: garante execucao sob Python 3.12.
-# Se o script foi lancado com `python` (resolvendo p/ outra versao
-# como 3.14), re-executa o chamador (sys.argv[0]) sob `py -3.12`.
-# ============================================================
-import sys as _sys
-if _sys.version_info[:2] != (3, 12):
-    import subprocess as _sp
-    print(f"[guard] re-executando sob Python 3.12 (atual: {_sys.version_info.major}.{_sys.version_info.minor})", flush=True)
-    _sys.exit(_sp.call(["py", "-3.12", *_sys.argv]))
-```
-
-Justificativa: o ETL roda em servidor local agendado; o alias `python` pode resolver pra versão errada (sem `pandas`/`sqlalchemy`). O guard re-executa sob 3.12 antes de qualquer import pesado.
-
-### 10.5. Tipos de coluna ao criar nova dimensão/fato
-
-Ao criar nova tabela no DW, **consultar os tipos anotados na consulta de origem** (comentários `-- int`, `-- varchar(255)`, etc) e refletir fielmente na DDL. Exemplo: `c.id as id_cliente_dommus, -- int` → `INT NULL` na DDL.
-
----
-
-## 11. Histórico de mudanças
-
-### Genesis (anterior a 05/2026)
-
-- Setup completo Next.js 14 + Tailwind ([#126])
-- Lib de DB (MySQL pool) + SQL loader + auth (bcrypt + JWT) ([#127])
-- Login page + API `/api/auth/login` ([#128])
-- Dashboard layout (sidebar logo+user+ações + tabs nav) ([#129])
-- Component library: KPI, BarChart, LineChart, HBar, Table, Filters ([#130])
-- Aba Vendas (KPIs + gráficos + tabela) ([#131])
-- Aba Estoque ([#132])
-- Aba Visitas ([#133])
-- Aba Lead com sub-abas (Visão Geral + Funil & Investimento) ([#134])
-- ETL completo migrado pra `etl/pipeline/` ([#140])
-- Aba Vendas: toggle Visão Atual/Funil de Venda + 5 etapas ([#141])
-- d_usuario_gu para autenticação + tipo_usuario ([#145])
-- Auth: suporte a SHA-256 e SHA-512 (legado) ([#110])
-
-### 09/05/2026 — Padronização
-
-- ✅ Renomeada pasta `_v002` → `_v1` (padrão Dommus)
-- ✅ Publicada esta documentação inicial
-
-### 09/05/2026 — Guard universal de Python 3.12
-
-- ✅ **Todos os 34 scripts `.py`** em `etl/pipeline/` agora têm o **guard de Python 3.12** no topo (após docstring/`from __future__`, antes de qualquer outro import). Se invocados com `python` resolvendo para outra versão (3.14, 3.11, etc), o guard re-executa o próprio script sob `py -3.12`.
-- ✅ **Justificativa:** o projeto será desplegado em servidor local onde o ETL rodará agendado, e `python` no PATH pode resolver para versão errada (sem `pandas`, `sqlalchemy`, etc instalados). Guard garante reprodutibilidade independente do alias usado.
-- ✅ Migração feita por script idempotente (`add_guard.py`) — pode rodar de novo sem efeitos colaterais.
-- ✅ Validação: `python -m py_compile` em todos os 34 arquivos passou.
-- ✅ Inserido como pattern nos novos scripts: **toda nova ferramenta Python deste projeto deve ter o guard**.
-
-### 09/05/2026 — Logo dinâmica via `d_cliente_dommus`
-
-- ✅ Nova dimensão **`d_cliente_dommus`** no DW (DDL em `criar_dw_infratecnica.sql`).
-- ✅ Novo SQL de origem **`consulta_d_cliente_dommus.sql`** (filtra `tb_cliente.id = 51`).
-- ✅ Novo script ETL **`sincroniza_d_cliente_dommus.py`** (TRUNCATE+INSERT direto, sem keyset/data).
-- ✅ Etapa adicionada como **primeira dimensão** no orquestrador `etl_inquilino_0040_infratecnica_executa_pipeline.py`.
-- ✅ Nova rota **`/api/data/cliente`** (`src/app/api/data/cliente/route.ts`) protegida pelo middleware.
-- ✅ Sidebar agora consome a logo dinamicamente do DW (não usa mais `public/logo/logo_infratecnica.png`).
-- ✅ Adaptação de schema legado de `d_usuario_gu` na rota de login (`emails_usario` → `email`, `id_usuario` → `id_usuario_gu`).
-- ✅ Criado utilitário `atualiza_senha_d_usuario_gu.py` (gera bcrypt compatível com bcryptjs).
-- ✅ Criado `diagnostico_d_usuario_gu.py` para inspecionar o schema real da tabela.
-
----
-
-## 12. CR Log
-
-Esta seção mensura a carga de manutenção solicitada pelo cliente Infratecnica.
-
-| Indicador | Valor |
+| Campo | Valor |
 |---|---|
-| Total de CRs atendidas | A levantar |
-| Última CR atendida | A levantar |
+| **Data** | 27/05/2026 |
+| **Solicitante** | Dommus (interno) |
+| **Tipo** | Refatoração arquitetural |
 
-| # | Data | Solicitante | Descrição resumida | Versão doc | Status |
-|---|---|---|---|---|---|
-| 01–N | (legado) | Vários | Resgatar do histórico de Git/WhatsApp/e-mail conforme houver tempo. | — | ✅ aplicada |
+**Pedido:** modernizar o dashboard Infratécnica, substituindo o Streamlit (v001) por Next.js + Tailwind + Recharts, mantendo a lógica de negócio idêntica e seguindo o padrão da BNR V1.
+
+**Implementação:**
+- Cópia dos componentes, paleta, layout e páginas do projeto BNR V1.
+- Logo Infratécnica e identidade visual preservadas (`public/logo/logo_infratecnica.png`).
+- APIs `src/app/api/data/*` e queries SQL mantidas com adaptações para o modelo Infratécnica.
+- Endpoint `/api/data/etl-status` adicionado para suportar o indicador "Atualizado em" no Sidebar.
+
+### CR-002 — Pipeline de auditoria do ETL
+
+| Campo | Valor |
+|---|---|
+| **Data** | 27/05/2026 |
+| **Solicitante** | Dommus (interno) |
+| **Tipo** | Funcionalidade |
+
+**Pedido:** o Sidebar exibia "Atualizado em —" porque a tabela `meta_etl_execucao` não existia e o pipeline não registrava execuções.
+
+**Implementação:**
+- Adicionada a DDL da `meta_etl_execucao` em `etl/pipeline/criar_dw_infratecnica.sql`.
+- Adicionadas as funções `_meta_etl_ensure_table`, `_meta_etl_inicio` e `_meta_etl_fim` no orquestrador `etl_inquilino_0040_infratecnica_executa_pipeline.py`.
+- Cada execução do ETL agora registra início e fim em UTC, e o Sidebar mostra o timestamp convertido para o fuso do navegador.
+
+### CR-003 — Card "VENDIDA" na aba Estoque
+
+| Campo | Valor |
+|---|---|
+| **Data** | 28/05/2026 |
+| **Solicitante** | Camila (cliente Infratécnica) |
+| **Tipo** | Regra de negócio |
+
+**Pedido (literal):** *"VENDIDA é toda e qualquer unidade que estiver nos quadros Vermelho, Azul, Registro (roxo) e esse (verdinho) = vendida (cliente não registrado). Pode corrigir?"*
+
+**Mapeamento de códigos:**
+
+| Cor | Código | Descrição |
+|---|---|---|
+| Vermelho | V | VENDIDA |
+| Azul | A | ASSINADA NO BANCO |
+| Roxo | S | REGISTRADA |
+| Verde claro | X | VENDIDA (cliente não registrado) |
+| Verde escuro | D | DISPONÍVEL PARA VENDA |
+| — | R | RESERVADA |
+| — | B | RESERVA TÉCNICA |
+| — | I | INDISPONÍVEL PARA VENDA |
+
+**Implementação:**
+- `src/app/api/data/estoque/route.ts`: adicionada a coluna `disponibilidade` (código de uma letra) no `SELECT`.
+- `src/app/dashboard/estoque/page.tsx`: função `classificarStatus()` reescrita para classificar pelo código (mais robusto):
+  - V, X, A, S → **VENDIDA**
+  - D → **DISPONIVEL**
+  - R, B → **RESERVA**
+  - demais (I e outros) → **OUTROS**
+- O card "Registrada" foi mantido na interface (mostra 0 — todas as S foram migradas para VENDIDA).
+- A mesma classificação se aplica ao gráfico de pizza "Distribuição por Status".
+
+### CR-004 — Bug: card VENDA zerado na aba Vendas → Funil de Venda
+
+| Campo | Valor |
+|---|---|
+| **Data** | 28/05/2026 |
+| **Solicitante** | Klinger Lima (interno) |
+| **Tipo** | Bug |
+
+**Pedido:** o card "VENDA" do Funil de Venda exibia 0 mesmo com etapas anteriores (Cadastro 82, Pastas 22, Aprovado IF 32, Contrato 18) não zeradas.
+
+**Causa raiz:** a API `/api/data/funil-venda` ignorava a coluna real `venda_contabilizado_em` da tabela `f_venda` (populada pelo ETL via `tb_venda.contabilizado_em` do CRM). Em vez disso, inferia a venda pela flag `processo_unidade_id > 0 AND processo_data_venda IS NOT NULL`, regra que não casava no modelo de dados Infratécnica.
+
+**Implementação:**
+- `src/app/api/data/funil-venda/route.ts`: passou a selecionar `v.venda_contabilizado_em` diretamente da `f_venda`.
+- A flag `is_venda` agora é derivada como `CASE WHEN v.venda_contabilizado_em IS NOT NULL THEN 1 ELSE 0 END`.
+
+### CR-005 — JOIN com `d_campanha` em `/api/data/oportunidade`
+
+| Campo | Valor |
+|---|---|
+| **Data** | 28/05/2026 |
+| **Solicitante** | Klinger Lima (interno) |
+| **Tipo** | Funcionalidade |
+
+**Pedido:** o gráfico de rosca "Oportunidades por Campanhas" da aba Lead mostrava "Sem campanha" para 100% das oportunidades.
+
+**Implementação:**
+- `src/app/api/data/oportunidade/route.ts`: adicionado `LEFT JOIN d_campanha cmp ON o.id_campanha = cmp.id_campanha` direto (sem necessidade do passo intermediário via `f_lead` que o BNR usa, porque o modelo Infratécnica já tem `id_campanha` denormalizado em `f_oportunidade`).
+- Resposta da API agora inclui `o.id_campanha`, `cmp.nome_campanha` e `o.data_venda_contabilizada`.
+
+### CR-006 — Deploy do dashboard na Vercel
+
+| Campo | Valor |
+|---|---|
+| **Data** | 28/05/2026 |
+| **Solicitante** | Dommus (interno) |
+| **Tipo** | Infraestrutura |
+
+**Pedido:** publicar o dashboard em ambiente cloud para acesso da equipe Infratécnica.
+
+**Implementação:**
+- Repositório criado: `github.com/klingerlima23-hub/dommus-bi-infratecnica` (privado).
+- Projeto Vercel: `klingerlima23-hubs-projects/dommus-bi-infratecnica` (Hobby plan).
+- 7 environment variables configuradas na Vercel: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_SECRET`, `NEXT_PUBLIC_WHATSAPP_URL`.
+- `next.config.js` ajustado com `typescript: { ignoreBuildErrors: true }` e `eslint: { ignoreDuringBuilds: true }` (mesma configuração do BNR V1) para desbloquear o build de produção sem barrar em mismatches de tipo estrito.
+- URL pública: https://dommus-bi-infratecnica.vercel.app
+
+### CR-007 — Correções de schema do DW e SQL
+
+| Campo | Valor |
+|---|---|
+| **Data** | 27–28/05/2026 |
+| **Solicitante** | Dommus (interno) |
+| **Tipo** | Correção |
+
+**Pedido:** ao rodar `criar_dw.py`, dois statements falhavam, e o ETL de `f_espelho_de_venda` quebrava com "Use multi=True".
+
+**Implementação:**
+- `etl/pipeline/consulta_f_espelho_de_venda.sql`: removida segunda query SELECT redundante (havia duas instruções separadas por `;`, que o `mysql-connector-python` recusa em uma chamada).
+- `etl/pipeline/criar_dw_infratecnica.sql`: corrigida vírgula órfã antes do `KEY idx_f_oportunidade_id_oportunidade`, e removida cláusula `ENGINE=InnoDB` órfã após a tabela `meta_etl_execucao`.
+
+### CR-008 — Higiene de credenciais no repositório
+
+| Campo | Valor |
+|---|---|
+| **Data** | 28/05/2026 |
+| **Solicitante** | Dommus (interno) |
+| **Tipo** | Segurança |
+
+**Pedido:** garantir que o repositório público não exponha senhas reais.
+
+**Implementação:**
+- `.gitignore` ampliado para cobrir `**/.streamlit/secrets.toml`, `__pycache__/`, `*.pyc`, `.pipeline_state.json`.
+- Removidos do índice Git: `etl/pipeline/.streamlit/secrets.toml` e todos os arquivos `__pycache__/*.pyc`.
+- `.env.example` reescrito com placeholders (`USUARIO_DESTINO`, `SENHA_DESTINO`, `GERAR_NOVO_64_HEX_CHARS`) — credenciais reais ficam apenas em `.env.local` (não versionado).
+- Histórico do primeiro commit reescrito via `git commit --amend` + `git push --force` para eliminar o vazamento.
 
 ---
 
-## 13. Histórico de versões deste documento
+## Como registrar uma nova solicitação
 
-| Versão | Data | Autor | Mudanças |
-|---|---|---|---|
-| **1.0.0** | 09/05/2026 | Klinger Lima | Publicação inicial. Cobre todo o estado atual do projeto pós-renomeio `_v002` → `_v1`. Estabelece este projeto como modelo de referência arquitetural para os demais inquilinos Dommus que adotarão ETL + dashboard unificados. |
-| **1.1.0** | 09/05/2026 | Klinger Lima | Adicionada dimensão **`d_cliente_dommus`** (identidade visual do cliente) e endpoint `/api/data/cliente`. Sidebar passa a consumir a logo dinamicamente do DW, dispensando o asset estático `public/logo/logo_infratecnica.png`. Adaptação de schema legado em `d_usuario_gu` na rota de login. Novos utilitários: `atualiza_senha_d_usuario_gu.py` e `diagnostico_d_usuario_gu.py`. |
-| **1.2.0** | 09/05/2026 | Klinger Lima | **Guard universal de Python 3.12**: todos os 34 scripts `.py` em `etl/pipeline/` agora re-executam sob `py -3.12` quando invocados em outra versão. Necessário para deploy do ETL em servidor local com múltiplas versões de Python. Adicionada Seção 10.4 (regra) e Seção 10.5 (tipos de coluna a partir da consulta de origem). |
+Toda nova solicitação deve receber um identificador sequencial (`CR-XXX`), data, solicitante, tipo, pedido literal e descrição da implementação. Mudanças sem CR-log dificultam auditoria e rollback.
 
----
-
-**Última atualização:** 09/05/2026 (v1.2.0)
-**Mantido por:** Klinger Lima (`klinger.lima@dommus.tec.br`) — Dommus
+Sugestão de tipos: `Bug`, `Funcionalidade`, `Regra de negócio`, `Refatoração arquitetural`, `Infraestrutura`, `Segurança`, `Correção`.

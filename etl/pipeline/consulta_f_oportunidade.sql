@@ -64,5 +64,5 @@ FROM crm_inquilino_0040.oportunidade O
     LEFT JOIN dommus_infratecnica.tb_venda V ON V.processo = P.id AND V.situacao = 'F'
     LEFT JOIN dommus_infratecnica.tb_etapas_workflow EW ON EW.id = P.etapa_workflow AND EW.status = '1' AND EW.workflow = P.workflow
 WHERE O.ativo = '1'
-  AND O.criado_em between '{data_inicio}' and '{data_fim}'
+  AND O.criado_em >= '{data_inicio}' AND O.criado_em <= '{data_fim}'
 GROUP BY O.id_oportunidade

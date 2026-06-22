@@ -1,6 +1,7 @@
 -- dw_infratecnica.d_corretor --
 SELECT
 	CAST(RI.json_externo AS UNSIGNED) AS 'id_corretor',
+	SG.id                             AS 'id_corretor_rk', -- int
 	eq.id as 'id_equipe',
 	TU.descricao AS 'tipo_corretor',
 	upper(SG.nome) AS 'nome_corretor',

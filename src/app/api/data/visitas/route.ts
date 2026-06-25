@@ -4,6 +4,8 @@ import { query } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// Camada 2 do fix de timezone: DATE_FORMAT defensivo nas datas pra
+// devolver ISO 8601 SEM Z (vide GUIA_DISTRATOS_FILTROS_TIMEZONE.md).
 const SQL = `
 SELECT * FROM (
     SELECT
@@ -11,9 +13,9 @@ SELECT * FROM (
         criador.nome_corretor AS criou_visita,
         responsavel.nome_corretor AS responsavel_visita,
         concluiu.nome_corretor AS concluiu_visita,
-        v.data_cadastro,
-        v.data_visita,
-        v.data_conclusao_visita,
+        DATE_FORMAT(v.data_cadastro,          '%Y-%m-%dT%H:%i:%s') AS data_cadastro,
+        DATE_FORMAT(v.data_visita,            '%Y-%m-%dT%H:%i:%s') AS data_visita,
+        DATE_FORMAT(v.data_conclusao_visita,  '%Y-%m-%dT%H:%i:%s') AS data_conclusao_visita,
         v.local_visita,
         v.visita_realizada,
         v.tipo_visita,

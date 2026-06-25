@@ -163,7 +163,7 @@ export default function RankingVendas() {
   }
 
   const filtered = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return rows.filter((r) => {
       const v = getDateOf(r);
@@ -248,8 +248,8 @@ export default function RankingVendas() {
             - Filtrar por (RadioGroup 2 opcoes)   -> 3 cols  (cabe "Data de Venda" + "Data de Contabilizacao" inline)
             - Empreendimento / Equipe / Gerente   -> 2 cols cada
           Em md vira 2 colunas; em mobile, 1. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
-        <div className="lg:col-span-3">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+        <div>
           <DateRangeFilter
             label={`Periodo (${tipoData.toLowerCase()})`}
             start={period.start}
@@ -257,7 +257,7 @@ export default function RankingVendas() {
             onChange={(start, end) => setPeriod({ start, end })}
           />
         </div>
-        <div className="lg:col-span-3">
+        <div>
           <RadioGroup
             label="Filtrar por"
             options={TIPOS_DATA}
@@ -265,7 +265,7 @@ export default function RankingVendas() {
             onChange={setTipoData}
           />
         </div>
-        <div className="lg:col-span-2">
+        <div>
           <MultiSelectFilter
             label="Empreendimento"
             options={empOptions}
@@ -273,7 +273,7 @@ export default function RankingVendas() {
             onChange={setEmpSel}
           />
         </div>
-        <div className="lg:col-span-2">
+        <div>
           <MultiSelectFilter
             label="Equipe"
             options={eqOptions}
@@ -281,7 +281,7 @@ export default function RankingVendas() {
             onChange={setEqSel}
           />
         </div>
-        <div className="lg:col-span-2">
+        <div>
           <MultiSelectFilter
             label="Gerente"
             options={gerOptions}
@@ -652,9 +652,9 @@ function DetalhamentoTable({ rows }: { rows: Row[] }) {
     { key: 'empreendimento_nome', label: 'Empreendimento', type: 'string' },
     { key: 'unidade_descricao', label: 'Unidade', type: 'string' },
     { key: 'etapa_atual', label: 'Etapa Atual', type: 'string' },
-    { key: 'lead_origem', label: 'Origem', type: 'string' },
-    { key: 'lead_campanha', label: 'Campanha', type: 'string' },
-    { key: 'lead_midia', label: 'Midia', type: 'string' },
+    { key: 'lead_origem', label: 'Origem', type: 'string', uppercase: true },
+    { key: 'lead_campanha', label: 'Campanha', type: 'string', uppercase: true },
+    { key: 'lead_midia', label: 'Midia', type: 'string', uppercase: true },
     { key: 'unidade_valor_liquido', label: 'Valor Liquido', type: 'money' },
     { key: 'unidade_valor', label: 'Valor Unidade', type: 'money' },
   ];

@@ -57,40 +57,12 @@ WHERE v.id_corretor IS NOT NULL
   AND (v.processo_data_venda IS NOT NULL OR v.venda_contabilizado_em IS NOT NULL)
 `;
 
-// Diagnostico: aceita ?debug=1 e retorna contagens em cada nivel de
-// filtragem -- assim conseguimos ver SEM precisar acessar o DW direto
-// onde o dataset esta sumindo (sem dados? sem id_corretor? sem datas?).
-const SQL_DEBUG = `
-SELECT
-  (SELECT COUNT(*) FROM f_venda)                                                                                  AS total_f_venda,
-  (SELECT COUNT(*) FROM f_venda WHERE id_corretor IS NOT NULL)                                                    AS com_id_corretor,
-  (SELECT COUNT(*) FROM f_venda WHERE venda_contabilizado_em IS NOT NULL)                                         AS com_contabilizado,
-  (SELECT COUNT(*) FROM f_venda WHERE processo_data_venda IS NOT NULL)                                            AS com_processo_data_venda,
-  (SELECT COUNT(*) FROM f_venda WHERE venda_data IS NOT NULL)                                                     AS com_venda_data,
-  (SELECT COUNT(*) FROM f_venda WHERE id_corretor IS NOT NULL AND venda_contabilizado_em IS NOT NULL)             AS com_id_e_contab,
-  (SELECT COUNT(*) FROM f_venda WHERE id_corretor IS NOT NULL AND (processo_data_venda IS NOT NULL OR venda_contabilizado_em IS NOT NULL)) AS passa_where,
-  (SELECT COUNT(*) FROM d_corretor)                                                                               AS total_d_corretor,
-  (SELECT COUNT(*) FROM d_corretor WHERE id_corretor_rk IS NOT NULL)                                              AS d_corretor_com_rk
-`;
-
-export async function GET(req: Request) {
-  const debug = new URL(req.url).searchParams.get('debug') === '1';
+export async function GET() {
   try {
-    if (debug) {
-      const meta = await query(SQL_DEBUG);
-      const sample = await query(
-        'SELECT processo_id, id_gerente, id_corretor, id_equipe, corretor_nome, gerente_nome, equipe_nome FROM f_venda WHERE venda_contabilizado_em IS NOT NULL ORDER BY venda_contabilizado_em DESC LIMIT 5',
-      );
-      // DESCRIBE pra confirmar quais colunas REALMENTE existem na f_venda atual
-      const cols = await query('SHOW COLUMNS FROM f_venda LIKE "%corretor%"');
-      // Sample do d_corretor pra ver os tipos
-      const dc = await query('SELECT id_corretor, id_corretor_rk, nome_corretor FROM d_corretor WHERE id_corretor_rk IS NOT NULL LIMIT 3');
-      return NextResponse.json({ meta: meta[0], sample, cols, dc });
-    }
     const rows = await query(SQL);
     return NextResponse.json({ rows });
   } catch (err) {
     console.error('[/api/data/ranking-vendas]', err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao carregar Ranking de Vendas.' }, { status: 500 });
   }
 }

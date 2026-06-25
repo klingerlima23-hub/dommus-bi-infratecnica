@@ -31,14 +31,14 @@ export default function MultiSelectFilter({ label, options, selected, onChange, 
   const filtered = options.filter((o) => o.toLowerCase().includes(filter.toLowerCase()));
 
   return (
-    <div className="relative" ref={ref}>
-      <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-[#5A6677] mb-1.5">
+    <div className="relative inline-block w-44" ref={ref}>
+      <label className="block text-[0.62rem] font-semibold uppercase tracking-wider text-[#7F8C8D] mb-1">
         {label}
       </label>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-3 py-2 bg-[#F4F6FA] border border-[#E5E9F0] rounded-md text-sm text-left flex items-center justify-between hover:bg-white hover:border-[#0F4C81] transition"
+        className="w-full h-9 px-2.5 bg-[#F4F6FA] border border-[#E5E9F0] rounded-md text-xs text-left flex items-center justify-between hover:bg-white hover:border-[#0F4C81] transition"
       >
         <span className="truncate text-[#1A2B3C]">
           {selected.length === 0 ? <span className="text-[#5A6677]">{placeholder}</span> : `${selected.length} selecionado(s)`}
@@ -51,7 +51,7 @@ export default function MultiSelectFilter({ label, options, selected, onChange, 
           {selected.map((s) => (
             <span
               key={s}
-              className="inline-flex items-center gap-1 text-[0.7rem] bg-[#0F4C81] text-white rounded px-1.5 py-0.5"
+              className="inline-flex items-center gap-1 text-[0.7rem] bg-[#0F4C81] text-white rounded px-1.5 py-0.5 uppercase"
             >
               {s}
               <button onClick={() => toggle(s)} className="hover:text-[#F6A623]">
@@ -63,13 +63,13 @@ export default function MultiSelectFilter({ label, options, selected, onChange, 
       )}
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-[#E5E9F0] rounded-md shadow-lg max-h-72 overflow-hidden flex flex-col">
+        <div className="absolute z-20 mt-1 min-w-full w-[14rem] bg-white border border-[#E5E9F0] rounded-md shadow-lg max-h-72 overflow-hidden flex flex-col">
           <input
             type="text"
             placeholder="Filtrar…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 border-b border-[#E5E9F0] text-sm focus:outline-none"
+            className="px-3 py-2 border-b border-[#E5E9F0] text-xs focus:outline-none"
           />
           <div className="overflow-auto flex-1">
             {filtered.length === 0 && <p className="text-xs text-[#5A6677] px-3 py-2">Nenhuma opção</p>}
@@ -80,7 +80,7 @@ export default function MultiSelectFilter({ label, options, selected, onChange, 
                   key={opt}
                   type="button"
                   onClick={() => toggle(opt)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-[#F4F6FA] text-left"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-[#F4F6FA] text-left"
                 >
                   <span
                     className={`w-4 h-4 border rounded flex items-center justify-center shrink-0 ${
@@ -89,7 +89,7 @@ export default function MultiSelectFilter({ label, options, selected, onChange, 
                   >
                     {checked && <Check size={10} className="text-white" />}
                   </span>
-                  <span className="truncate">{opt}</span>
+                  <span className="truncate uppercase">{opt}</span>
                 </button>
               );
             })}

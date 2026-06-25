@@ -478,6 +478,23 @@ CREATE TABLE IF NOT EXISTS `f_descarte` (
 )
 ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------- f_distrato ----------
+CREATE TABLE IF NOT EXISTS `f_distrato` (
+  `processo_id` BIGINT NULL,
+  `processo_id_oportunidade` BIGINT NULL,
+  `empreendimento_id` BIGINT NULL,
+  `empreendimento_nome` VARCHAR(255) NULL,
+  `data_distrato` DATE NULL,
+  `motivo_distrato` VARCHAR(255) NULL,
+  `lead_campanha` VARCHAR(255) NULL,
+  `lead_midia` VARCHAR(255) NULL,
+  `lead_origem` VARCHAR(255) NULL,
+  KEY `idx_f_distrato_processo_id` (`processo_id`),
+  KEY `idx_f_distrato_data_distrato` (`data_distrato`),
+  KEY `idx_f_distrato_empreendimento_id` (`empreendimento_id`)
+)
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------- f_visita ----------
 CREATE TABLE IF NOT EXISTS `f_visita` (
   `id_visita` BIGINT NULL COMMENT 'int',

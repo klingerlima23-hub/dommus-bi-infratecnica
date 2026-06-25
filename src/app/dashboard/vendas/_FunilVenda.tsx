@@ -43,7 +43,7 @@ function filtrarPorPeriodo(
   dateField: keyof Row,
   period: { start: string; end: string },
 ): Row[] {
-  const ini = new Date(period.start);
+  const ini = new Date(period.start + 'T00:00:00');
   const fim = new Date(period.end + 'T23:59:59');
   return rows.filter((r) => {
     const v = r[dateField];
@@ -167,7 +167,7 @@ export default function VendasFunilVenda() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label="Período (data de cadastro do processo)"
           start={period.start}

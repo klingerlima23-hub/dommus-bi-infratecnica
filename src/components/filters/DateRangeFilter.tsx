@@ -1,87 +1,48 @@
 'use client';
-
 import { useEffect, useState } from 'react';
+import { Calendar } from 'lucide-react';
 
 interface Props {
   label: string;
-  start: string; // ISO yyyy-mm-dd
+  start: string;
   end: string;
   onChange: (start: string, end: string) => void;
 }
 
-/**
- * Filtro de periodo com botao "Aplicar".
- *
- * Antes: cada digitacao numa das datas disparava onChange e forcava
- * recalculo do dashboard. Em telas com muitos dados, isso travava a UI
- * (ainda mais com data-pickers que disparam onChange a cada digito).
- *
- * Agora: o componente mantem estado local "pendente" e so propaga o
- * onChange para o pai quando o usuario clica em "Aplicar". Se o pai
- * mudar start/end por fora (ex.: reset), o estado local re-sincroniza.
- */
 export default function DateRangeFilter({ label, start, end, onChange }: Props) {
-  const [pendingStart, setPendingStart] = useState(start);
-  const [pendingEnd, setPendingEnd] = useState(end);
+  const [localStart, setLocalStart] = useState(start);
+  const [localEnd, setLocalEnd] = useState(end);
 
-  // Re-sincroniza com as props caso o pai altere as datas por fora
-  // (ex.: botao "limpar filtro", troca de aba que reseta o range).
-  useEffect(() => {
-    setPendingStart(start);
-  }, [start]);
-  useEffect(() => {
-    setPendingEnd(end);
-  }, [end]);
+  useEffect(() => { setLocalStart(start); }, [start]);
+  useEffect(() => { setLocalEnd(end); }, [end]);
 
-  const dirty = pendingStart !== start || pendingEnd !== end;
+  const dirty = localStart !== start || localEnd !== end;
 
   function aplicar() {
-    onChange(pendingStart, pendingEnd);
+    if (dirty) onChange(localStart, localEnd);
+  }
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') aplicar();
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      aplicar();
-    }
-  }
+  const inputClasses = 'bg-transparent border-0 outline-none text-xs text-[#1A2B3C] px-0';
 
   return (
     <div>
-      <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-[#5A6677] mb-1.5">
+      <label className="block text-[0.62rem] font-semibold uppercase tracking-wider text-[#7F8C8D] mb-1">
         {label}
       </label>
-      {/* Container unico: datas + 'ate' + Aplicar dentro de UMA caixa branca
-          com borda fina, igual ao mockup. Os <input type=date> ficam sem
-          borda propria (transparentes); o 'Aplicar' fica como texto/link
-          bold a direita -- azul Dommus quando ha mudanca pendente, cinza
-          claro (desabilitado) quando nao ha. */}
-      <div className="inline-flex items-center gap-2 bg-white border border-[#E5E9F0] rounded-md px-3 py-1.5 focus-within:border-[#0F4C81] transition">
-        <input
-          type="date"
-          value={pendingStart}
-          onChange={(e) => setPendingStart(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="bg-transparent border-0 outline-none text-sm text-[#1A2B3C] px-1"
-        />
-        <span className="text-[#5A6677] text-sm">ate</span>
-        <input
-          type="date"
-          value={pendingEnd}
-          onChange={(e) => setPendingEnd(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="bg-transparent border-0 outline-none text-sm text-[#1A2B3C] px-1"
-        />
+      <div className="inline-flex h-9 items-center gap-3 bg-white border border-[#E5E9F0] rounded-md px-3">
+        <Calendar size={14} className="text-[#5A6677] shrink-0" />
+        <input type="date" value={localStart} onChange={(e) => setLocalStart(e.target.value)} onKeyDown={handleKeyDown} className={inputClasses} />
+        <span className="text-[#5A6677] text-xs">ate</span>
+        <Calendar size={14} className="text-[#5A6677] shrink-0" />
+        <input type="date" value={localEnd} onChange={(e) => setLocalEnd(e.target.value)} onKeyDown={handleKeyDown} className={inputClasses} />
         <button
           type="button"
           onClick={aplicar}
           disabled={!dirty}
-          title={dirty ? 'Aplicar o periodo selecionado' : 'Nenhuma alteracao pendente'}
-          className={
-            'ml-1 pl-2 text-sm font-bold transition ' +
-            (dirty
-              ? 'text-[#1A2B3C] hover:text-[#0F4C81] cursor-pointer'
-              : 'text-[#B0BEC5] cursor-not-allowed')
-          }
+          className={'ml-1 text-[#0F4C81] text-xs font-semibold transition ' + (dirty ? 'opacity-100 cursor-pointer hover:underline' : 'opacity-40 cursor-not-allowed')}
         >
           Aplicar
         </button>

@@ -144,7 +144,7 @@ export default function LeadFunilInvestimento() {
 
   // OPVs no período
   const opvsFiltrados = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     let base = opvs.filter((r) => {
       if (!r.data_distribuicao) return false;
@@ -193,7 +193,7 @@ export default function LeadFunilInvestimento() {
 
   // Investimento no período
   const investimentoFiltrado = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     let base = investimento.filter((r) => {
       if (!r.data_investimento) return false;
@@ -311,9 +311,9 @@ export default function LeadFunilInvestimento() {
     { key: 'nome_gerente', label: 'Gerente' },
     { key: 'nome_corretor', label: 'Corretor' },
     { key: 'nome_empreendimento', label: 'Empreendimento' },
-    { key: 'nome_campanha', label: 'Campanha' },
-    { key: 'nome_midia', label: 'Mídia' },
-    { key: 'nome_origem', label: 'Origem' },
+    { key: 'nome_campanha', label: 'Campanha', uppercase: true },
+    { key: 'nome_midia', label: 'Mídia', uppercase: true },
+    { key: 'nome_origem', label: 'Origem', uppercase: true },
   ];
 
   if (loading) return <LoadingState message="Carregando funil & investimento…" />;
@@ -321,7 +321,7 @@ export default function LeadFunilInvestimento() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label="Período (data distribuicao)"
           start={period.start}

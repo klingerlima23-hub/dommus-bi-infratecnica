@@ -38,7 +38,7 @@ interface RowVisita {
   visita_realizada: string;
 }
 
-const GRANS = ['Dia', 'Semana', 'Mes', 'Trimestre', 'Ano'] as const;
+const GRANS = ['Dia', 'Semana', 'Mes'] as const;
 
 function defaultRange() {
   const now = new Date();
@@ -76,7 +76,7 @@ export default function LeadVisaoGeral() {
   }, []);
 
   const filtrado = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return opvs.filter((r) => {
       if (!r.data_distribuicao) return false;
@@ -102,7 +102,7 @@ export default function LeadVisaoGeral() {
   // (filtrado ja' garante data_distribuicao no periodo; aqui completamos com
   //  data_venda_contabilizada no mesmo periodo).
   const vendasGanhas = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return filtrado.filter((r) => {
       if (!r.data_venda_contabilizada) return false;
@@ -128,7 +128,7 @@ export default function LeadVisaoGeral() {
 
   // Visitas no período (filtra por data_visita)
   const visitasFiltradas = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return visitas.filter((v) => {
       if (!v.data_visita) return false;
@@ -238,7 +238,7 @@ export default function LeadVisaoGeral() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label="Período (data distribuicao)"
           start={period.start}

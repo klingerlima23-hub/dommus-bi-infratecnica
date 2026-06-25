@@ -41,7 +41,7 @@ interface Row {
 const METRICAS = ['Cadastros', 'Pastas', 'Venda', 'Reprovados', 'Reprovado Instituicao'] as const;
 type Metrica = (typeof METRICAS)[number];
 
-const GRANS = ['Dia', 'Semana', 'Mes', 'Trimestre', 'Ano'] as const;
+const GRANS = ['Dia', 'Semana', 'Mes'] as const;
 
 function defaultDateRange() {
   const now = new Date();
@@ -115,7 +115,7 @@ function filtrarPorPeriodo(
   dateField: keyof Row,
   period: { start: string; end: string },
 ): Row[] {
-  const ini = new Date(period.start);
+  const ini = new Date(period.start + 'T00:00:00');
   const fim = new Date(period.end + 'T23:59:59');
   return rows.filter((r) => {
     const v = r[dateField];
@@ -282,9 +282,9 @@ export default function VendasVisaoAtual() {
     { key: 'unidade_valor_liquido', label: 'Vlr Liquido Unid.', type: 'money' },
     { key: 'etapas_workflow_nome', label: 'Etapa Workflow' },
     { key: 'lead_criado_em', label: 'Data Lead', type: 'datetime' },
-    { key: 'lead_campanha', label: 'Campanha' },
-    { key: 'lead_origem', label: 'Origem Lead' },
-    { key: 'lead_midia', label: 'Midia' },
+    { key: 'lead_campanha', label: 'Campanha', uppercase: true },
+    { key: 'lead_origem', label: 'Origem Lead', uppercase: true },
+    { key: 'lead_midia', label: 'Midia', uppercase: true },
     { key: 'tipo_negociacao', label: 'Tipo Negociacao' },
   ];
 
@@ -299,7 +299,7 @@ export default function VendasVisaoAtual() {
       </div>
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label={periodLabelFor(metrica)}
           start={period.start}

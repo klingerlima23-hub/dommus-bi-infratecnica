@@ -166,6 +166,7 @@ try:
     _run("sincroniza_f_atendimento_oportunidade.py")
     _run("sincroniza_f_visita.py")
     _run("sincroniza_f_descarte.py")
+    _run("sincroniza_f_distrato.py")
     _run("sincroniza_f_funil.py")
     _run("sincroniza_f_investimento.py")
     _run("sincroniza_f_evolucao_processo.py")

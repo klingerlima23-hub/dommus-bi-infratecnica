@@ -7,10 +7,13 @@ export const revalidate = 0;
 // JOIN direto com d_campanha via f_oportunidade.id_campanha.
 // (No modelo Infratecnica, id_campanha foi denormalizado para f_oportunidade
 // pelo ETL -- nao precisamos passar por f_lead como no BNR.)
+// Camada 2 do fix de timezone: forca DATETIMEs como string ISO 8601
+// SEM sufixo Z. O JS no front faz new Date() e interpreta como horario
+// LOCAL -- nao ha conversao UTC<->BR. Vide GUIA_DISTRATOS_FILTROS_TIMEZONE.md.
 const SQL = `
 SELECT
     o.id_oportunidade,
-    o.data_cadastro AS data_distribuicao,
+    DATE_FORMAT(o.data_cadastro,           '%Y-%m-%dT%H:%i:%s') AS data_distribuicao,
     o.nome_primeiro_envolvido AS lead_nome,
     o.email_primeiro_envolvido AS lead_email,
     o.telefone_primeiro_envolvido AS lead_telefone,
@@ -21,8 +24,8 @@ SELECT
     etp.ordem AS ordem_status_oportunidade,
     etp.nome AS status_oportunidade,
     o.id_processo,
-    o.data_venda,
-    o.data_venda_contabilizada,
+    DATE_FORMAT(o.data_venda,              '%Y-%m-%dT%H:%i:%s') AS data_venda,
+    DATE_FORMAT(o.data_venda_contabilizada,'%Y-%m-%dT%H:%i:%s') AS data_venda_contabilizada,
     o.id_campanha,
     cmp.nome_campanha
 FROM f_oportunidade AS o

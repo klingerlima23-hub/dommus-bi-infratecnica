@@ -29,7 +29,7 @@ interface Row {
   visita_realizada: string;
 }
 
-const GRANS = ['Dia', 'Semana', 'Mes', 'Trimestre', 'Ano'] as const;
+const GRANS = ['Dia', 'Semana', 'Mes'] as const;
 const METRICAS_CHART = ['Visitas Cadastradas', 'Visitas Realizadas'] as const;
 type MetricaChart = (typeof METRICAS_CHART)[number];
 
@@ -70,7 +70,7 @@ export default function VisitasPage() {
   );
 
   const filtrado = useMemo(() => {
-    const ini = new Date(period.start);
+    const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return rows.filter((r) => {
       if (!r.data_visita) return false;
@@ -137,7 +137,7 @@ export default function VisitasPage() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
+      <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label="Período (data da visita)"
           start={period.start}

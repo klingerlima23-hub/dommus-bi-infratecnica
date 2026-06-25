@@ -22,8 +22,13 @@ function getPool(): mysql.Pool {
       connectionLimit: 5,
       queueLimit: 0,
       enableKeepAlive: true,
-      timezone: 'Z',
-      dateStrings: false,
+      // dateStrings:true devolve DATETIMEs como string crua sem conversao
+      // de timezone -- o driver com timezone:'Z' estava lendo datas BR-local
+      // como UTC e empurrando eventos pro mes anterior. Camada 1 do fix de
+      // timezone (vide GUIA_DISTRATOS_FILTROS_TIMEZONE.md). Defensivo:
+      // mesmo se essa flag nao pegar (pool em cache no Vercel), os
+      // endpoints usam DATE_FORMAT como camada 2.
+      dateStrings: true,
     });
   }
   return global._mysqlPool;

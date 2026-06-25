@@ -17,6 +17,11 @@ export interface Column<T> {
    * no CRM Infratecnica / leads.dommus.com.br direto da tabela.
    */
   link?: (row: T) => string | null;
+  /**
+   * Se true, aplica `text-transform: uppercase` na celula -- util pra campos
+   * sujos do CRM (campanha/midia/origem) que vem com casing inconsistente.
+   */
+  uppercase?: boolean;
 }
 
 interface Props<T extends object> {
@@ -173,8 +178,9 @@ export default function DataTable<T extends object>({
                   {columns.map((c) => {
                     const valor = formatCell((r as Record<string, unknown>)[c.key], c.type);
                     const href = c.link ? c.link(r) : null;
+                    const tdClass = `px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]${c.uppercase ? ' uppercase' : ''}`;
                     return (
-                      <td key={c.key} className="px-3 py-1.5 whitespace-nowrap text-[#1A2B3C]">
+                      <td key={c.key} className={tdClass}>
                         {href ? (
                           <a
                             href={href}

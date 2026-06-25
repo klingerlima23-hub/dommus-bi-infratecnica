@@ -20,9 +20,15 @@ SELECT * FROM (
         v.visita_realizada,
         v.tipo_visita,
         e.nome_empreendimento,
+        -- Uma linha por OPV (id_oportunidade). Se houver multiplos
+        -- cadastros pra mesma oportunidade (remarcacoes, reagendamentos,
+        -- etc.), mantem somente o mais RECENTE por data_cadastro.
+        -- Empate em data_cadastro: prioriza visita realizada e depois
+        -- data_visita mais recente.
         ROW_NUMBER() OVER (
-            PARTITION BY v.id_oportunidade, DATE(v.data_visita)
+            PARTITION BY v.id_oportunidade
             ORDER BY
+                v.data_cadastro DESC,
                 CASE WHEN v.visita_realizada = 'Sim' THEN 1 ELSE 2 END,
                 v.data_visita DESC
         ) AS rn

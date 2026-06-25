@@ -8,7 +8,6 @@ import StackedHBarChart from '@/components/charts/StackedHBarChart';
 import PeriodChart from '@/components/charts/PeriodChart';
 import RadioGroup from '@/components/filters/RadioGroup';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
-import SelectFilter from '@/components/filters/SelectFilter';
 import MultiSelectFilter from '@/components/filters/MultiSelectFilter';
 import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
@@ -306,7 +305,7 @@ export default function VendasVisaoAtual() {
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
-        <SelectFilter label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
+        <RadioGroup label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
         <MultiSelectFilter label="Empreendimento (opcional)" options={empOptions} selected={empSel} onChange={setEmpSel} />
         <MultiSelectFilter label="Etapa do processo (opcional)" options={etapaOptions} selected={etapaSel} onChange={setEtapaSel} />
       </div>

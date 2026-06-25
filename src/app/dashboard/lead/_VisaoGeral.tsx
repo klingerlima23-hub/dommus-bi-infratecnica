@@ -8,7 +8,7 @@ import PieChart from '@/components/charts/PieChart';
 import StackedHBarChart from '@/components/charts/StackedHBarChart';
 import PeriodChart from '@/components/charts/PeriodChart';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
-import SelectFilter from '@/components/filters/SelectFilter';
+import RadioGroup from '@/components/filters/RadioGroup';
 import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
@@ -245,7 +245,7 @@ export default function LeadVisaoGeral() {
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
-        <SelectFilter label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
+        <RadioGroup label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
       </div>
 
       <SectionTitle>Indicadores</SectionTitle>

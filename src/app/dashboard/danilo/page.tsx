@@ -139,11 +139,10 @@ export default function DashboardDanilo() {
 
   // Distribuicao por etapa do funil -- ordenacao SEMPRE pelo campo `ordem`
   // de dw_infratecnica.d_etapa_oportunidade (chega no endpoint como
-  // `ordem_status` via `etp.ordem` no JOIN). Como o Recharts BarChart
-  // vertical renderiza o PRIMEIRO item do array na parte de BAIXO do
-  // grafico, invertemos o sort (b - a) pra que a etapa de MENOR ordem
-  // (inicio do funil) fique embaixo e a de MAIOR ordem (fechamento)
-  // fique em cima -- lendo de baixo pra cima segue o fluxo do funil.
+  // `ordem_status` via `etp.ordem` no JOIN). Sort ASCENDENTE (a - b)
+  // deixa a etapa de MENOR ordem (inicio do funil) no TOPO e a de MAIOR
+  // ordem (fechamento) embaixo -- ordem visual "de cima pra baixo"
+  // acompanha o avanco no funil.
   const porStatus = useMemo(() => {
     type Agg = { qtd: number; estimado: number; real: number; ordem: number };
     const map = new Map<string, Agg>();
@@ -161,7 +160,7 @@ export default function DashboardDanilo() {
       map.set(k, cur);
     }
     return Array.from(map.entries())
-      .sort((a, b) => b[1].ordem - a[1].ordem)
+      .sort((a, b) => a[1].ordem - b[1].ordem)
       .map(([key, v]) => ({
         key,
         value: v.qtd,

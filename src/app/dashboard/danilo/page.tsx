@@ -11,7 +11,7 @@ import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
 import { fmtInt, fmtMoeda, fmtPct } from '@/lib/format';
-import { COR_ALERTA, COR_PRIMARIA, COR_SECUNDARIA } from '@/lib/paleta';
+import { COR_PRIMARIA } from '@/lib/paleta';
 import { urlOportunidade } from '@/lib/urls';
 
 // ---------------------------------------------------------------
@@ -68,19 +68,6 @@ function defaultDateRange() {
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   return { start: fmt(start), end: fmt(now) };
 }
-
-// Bucketiza dias sem atualizacao em faixas legiveis
-function bucketDias(dias: number | null): string {
-  if (dias === null) return 'Sem data';
-  if (dias <= 7) return '0-7 dias';
-  if (dias <= 14) return '8-14 dias';
-  if (dias <= 30) return '15-30 dias';
-  if (dias <= 60) return '31-60 dias';
-  return '60+ dias';
-}
-
-// Ordem cronologica dos buckets pro gr fico
-const ORDEM_BUCKETS = ['0-7 dias', '8-14 dias', '15-30 dias', '31-60 dias', '60+ dias', 'Sem data'];
 
 export default function DashboardDanilo() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -155,42 +142,6 @@ export default function DashboardDanilo() {
     return Array.from(map.entries())
       .sort((a, b) => a[1].ordem - b[1].ordem)
       .map(([key, v]) => ({ key, value: v.qtd }));
-  }, [filtered]);
-
-  // Distribuicao por faixa de dias sem atualizacao
-  const porDiasParado = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filtered) {
-      const k = bucketDias(r.dias_sem_atualizacao);
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
-    return ORDEM_BUCKETS.filter((b) => map.has(b)).map((b) => ({ key: b, value: map.get(b) ?? 0 }));
-  }, [filtered]);
-
-  // Top 10 corretores com mais oportunidades no funil
-  const porCorretor = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filtered) {
-      const k = r.nome_corretor || 'Sem corretor';
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([key, value]) => ({ key, value }));
-  }, [filtered]);
-
-  // Top 10 empreendimentos
-  const porEmpreendimento = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filtered) {
-      const k = r.nome_empreendimento || 'Sem empreendimento';
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([key, value]) => ({ key, value }));
   }, [filtered]);
 
   // Distribuicao por Tipo de Segmento (Agronegocio, Loteamento, etc)
@@ -317,27 +268,12 @@ export default function DashboardDanilo() {
         />
       </div>
 
-      {/* Graficos */}
+      {/* Graficos: etapa do funil (barras) + segmento e mercado (donuts) */}
       <SectionTitle>Distribuicao</SectionTitle>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <ChartCard title="Por Etapa do Funil" height={360}>
-          <HBarChart data={porStatus} color={COR_PRIMARIA} />
-        </ChartCard>
-        <ChartCard title="Tempo Sem Atualizacao" height={360}>
-          <HBarChart data={porDiasParado} color={COR_ALERTA} />
-        </ChartCard>
-      </div>
+      <ChartCard title="Por Etapa do Funil" height={360} className="mb-4">
+        <HBarChart data={porStatus} color={COR_PRIMARIA} />
+      </ChartCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <ChartCard title="Top 10 Corretores" height={360}>
-          <HBarChart data={porCorretor} color={COR_PRIMARIA} />
-        </ChartCard>
-        <ChartCard title="Top 10 Empreendimentos" height={360}>
-          <HBarChart data={porEmpreendimento} color={COR_SECUNDARIA} />
-        </ChartCard>
-      </div>
-
-      {/* Composicao por Segmento e Mercado (donuts) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <ChartCard title="Contratos por Segmento" height={360}>
           <PieChart data={porSegmento} donut centerSubtitle="Contratos" legendToggleable />

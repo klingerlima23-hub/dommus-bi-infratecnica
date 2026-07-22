@@ -281,37 +281,30 @@ export default function DashboardDanilo() {
 
       {/* Graficos */}
       <SectionTitle>Distribuicao</SectionTitle>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <ChartCard titulo="Por Etapa do Funil" subtitulo="Quantidade de contratos em cada status">
-          <div style={{ width: '100%', height: Math.max(280, porStatus.length * 32) }}>
-            <HBarChart data={porStatus} color={COR_PRIMARIA} />
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Por Etapa do Funil" height={360}>
+          <HBarChart data={porStatus} color={COR_PRIMARIA} />
         </ChartCard>
-        <ChartCard titulo="Tempo Sem Atualizacao" subtitulo="Distribuicao por faixa de dias parado">
-          <div style={{ width: '100%', height: Math.max(280, porDiasParado.length * 40) }}>
-            <HBarChart data={porDiasParado} color={COR_ALERTA} />
-          </div>
+        <ChartCard title="Tempo Sem Atualizacao" height={360}>
+          <HBarChart data={porDiasParado} color={COR_ALERTA} />
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <ChartCard titulo="Top 10 Corretores" subtitulo="Corretores com mais contratos ativos">
-          <div style={{ width: '100%', height: Math.max(280, porCorretor.length * 32) }}>
-            <HBarChart data={porCorretor} color={COR_PRIMARIA} />
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Top 10 Corretores" height={360}>
+          <HBarChart data={porCorretor} color={COR_PRIMARIA} />
         </ChartCard>
-        <ChartCard titulo="Top 10 Empreendimentos" subtitulo="Empreendimentos com mais contratos no funil">
-          <div style={{ width: '100%', height: Math.max(280, porEmpreendimento.length * 32) }}>
-            <HBarChart data={porEmpreendimento} color={COR_SECUNDARIA} />
-          </div>
+        <ChartCard title="Top 10 Empreendimentos" height={360}>
+          <HBarChart data={porEmpreendimento} color={COR_SECUNDARIA} />
         </ChartCard>
       </div>
 
       {/* Tabela detalhada */}
       <SectionTitle>Detalhe dos Contratos</SectionTitle>
       <DataTable
-        data={dataTabela}
+        rows={dataTabela}
         columns={columns}
+        filename="danilo-contratos.csv"
         rowLink={(r) => urlOportunidade(r.id_oportunidade)}
       />
     </div>

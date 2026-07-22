@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DateRangeFilter from '@/components/filters/DateRangeFilter';
 import MultiSelectFilter from '@/components/filters/MultiSelectFilter';
+import RadioGroup from '@/components/filters/RadioGroup';
 import KPICard from '@/components/kpi/KPICard';
 import ChartCard from '@/components/charts/ChartCard';
 import HBarChart from '@/components/charts/HBarChart';
@@ -74,6 +75,12 @@ export default function DashboardDanilo() {
 
   const [period, setPeriod] = useState(defaultDateRange());
   const [statusSel, setStatusSel] = useState<string[]>([]);
+  // Metrica: define qual campo de data o filtro de periodo usa.
+  //   'Prospeccao' -> data_cadastro (quando a oportunidade foi criada)
+  //   'Contratos'  -> data_venda    (quando virou venda efetiva)
+  const METRICAS = ['Prospeccao', 'Contratos'] as const;
+  type Metrica = (typeof METRICAS)[number];
+  const [metrica, setMetrica] = useState<Metrica>('Prospeccao');
 
   useEffect(() => {
     let alive = true;
@@ -94,13 +101,17 @@ export default function DashboardDanilo() {
     const ini = new Date(period.start + 'T00:00:00');
     const fim = new Date(period.end + 'T23:59:59');
     return rows.filter((r) => {
-      if (!r.data_cadastro) return false;
-      const d = new Date(r.data_cadastro);
+      // Escolhe o campo de data conforme a metrica selecionada.
+      // Contratos: exige data_venda populada (senao a linha nao virou
+      // contrato ainda e nao entra na contagem).
+      const dataRef = metrica === 'Contratos' ? r.data_venda : r.data_cadastro;
+      if (!dataRef) return false;
+      const d = new Date(dataRef);
       if (d < ini || d > fim) return false;
       if (statusSel.length && !statusSel.includes(r.status_oportunidade || '')) return false;
       return true;
     });
-  }, [rows, period, statusSel]);
+  }, [rows, period, metrica, statusSel]);
 
   // Opcoes do filtro Status -- montadas do dataset completo.
   const statusOptions = useMemo(
@@ -258,11 +269,12 @@ export default function DashboardDanilo() {
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
-          label="Periodo (data cadastro)"
+          label={`Periodo (${metrica === 'Contratos' ? 'data venda' : 'data cadastro'})`}
           start={period.start}
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
+        <RadioGroup label="Metrica" options={METRICAS} value={metrica} onChange={setMetrica} />
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
       </div>
 

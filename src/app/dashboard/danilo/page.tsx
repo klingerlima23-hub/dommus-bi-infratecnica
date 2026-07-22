@@ -10,7 +10,7 @@ import PieChart from '@/components/charts/PieChart';
 import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
-import { fmtInt, fmtMoeda, fmtPct } from '@/lib/format';
+import { fmtInt, fmtMoeda } from '@/lib/format';
 import { COR_PRIMARIA } from '@/lib/paleta';
 import { urlOportunidade } from '@/lib/urls';
 
@@ -57,8 +57,6 @@ interface Row {
   tipo_segmento: string | null;
   [key: string]: unknown;
 }
-
-const DIAS_PARADO = 15;
 
 function defaultDateRange() {
   const now = new Date();
@@ -120,52 +118,83 @@ export default function DashboardDanilo() {
 
   // KPIs
   const total = filtered.length;
-  const parados = filtered.filter((r) => (r.dias_sem_atualizacao ?? 0) > DIAS_PARADO).length;
-  const pctParados = total > 0 ? parados / total : 0;
-  const diasComData = filtered.filter((r) => r.dias_sem_atualizacao !== null);
-  const tempoMedioParado =
-    diasComData.length > 0
-      ? Math.round(diasComData.reduce((s, r) => s + (r.dias_sem_atualizacao ?? 0), 0) / diasComData.length)
-      : 0;
   const valorEstimadoTotal = filtered.reduce((s, r) => s + num(r.valor_estimado), 0);
   const valorRealTotal = filtered.reduce((s, r) => s + num(r.valor_real), 0);
 
-  // Distribuicao por status (etapa) -- ordenado por ordem_status quando existe
+  // Helper: agrupa `filtered` por uma chave (funcao) e devolve entries
+  // com qtd + soma de valor_estimado / valor_real (para o tooltip).
+  function agruparComExtras(keyFn: (r: Row) => string) {
+    type Agg = { qtd: number; estimado: number; real: number };
+    const map = new Map<string, Agg>();
+    for (const r of filtered) {
+      const k = keyFn(r);
+      const cur = map.get(k) || { qtd: 0, estimado: 0, real: 0 };
+      cur.qtd += 1;
+      cur.estimado += num(r.valor_estimado);
+      cur.real += num(r.valor_real);
+      map.set(k, cur);
+    }
+    return map;
+  }
+
+  // Distribuicao por status (etapa) -- ordenado por ordem_status quando existe.
+  // Extras no tooltip: valor estimado e real acumulados por etapa.
   const porStatus = useMemo(() => {
-    const map = new Map<string, { qtd: number; ordem: number }>();
+    type Agg = { qtd: number; estimado: number; real: number; ordem: number };
+    const map = new Map<string, Agg>();
     for (const r of filtered) {
       const k = r.status_oportunidade || 'Sem status';
-      const cur = map.get(k) || { qtd: 0, ordem: r.ordem_status ?? 999 };
+      const cur = map.get(k) || { qtd: 0, estimado: 0, real: 0, ordem: r.ordem_status ?? 999 };
       cur.qtd += 1;
+      cur.estimado += num(r.valor_estimado);
+      cur.real += num(r.valor_real);
       map.set(k, cur);
     }
     return Array.from(map.entries())
       .sort((a, b) => a[1].ordem - b[1].ordem)
-      .map(([key, v]) => ({ key, value: v.qtd }));
+      .map(([key, v]) => ({
+        key,
+        value: v.qtd,
+        extras: [
+          { label: 'Valor Estimado', value: fmtMoeda(v.estimado) },
+          { label: 'Valor Real', value: fmtMoeda(v.real) },
+        ],
+      }));
   }, [filtered]);
 
   // Distribuicao por Tipo de Segmento (Agronegocio, Loteamento, etc)
   const porSegmento = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filtered) {
-      const k = r.tipo_segmento || 'Sem segmento';
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
+    const map = agruparComExtras((r) => r.tipo_segmento || 'Sem segmento');
     return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, value]) => ({ key, value }));
+      .sort((a, b) => b[1].qtd - a[1].qtd)
+      .map(([key, v]) => ({
+        key,
+        value: v.qtd,
+        extras: [
+          { label: 'Valor Estimado', value: fmtMoeda(v.estimado) },
+          { label: 'Valor Real', value: fmtMoeda(v.real) },
+        ],
+      }));
+    // agruparComExtras usa `filtered` internamente, mas ele nao e' um
+    // valor no escopo do useMemo; ainda assim capturamos filtered nas deps
+    // pra recomputar quando os filtros mudarem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
 
   // Distribuicao por Tipo de Mercado (Privado / Publico)
   const porMercado = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filtered) {
-      const k = r.tipo_mercado || 'Sem mercado';
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
+    const map = agruparComExtras((r) => r.tipo_mercado || 'Sem mercado');
     return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, value]) => ({ key, value }));
+      .sort((a, b) => b[1].qtd - a[1].qtd)
+      .map(([key, v]) => ({
+        key,
+        value: v.qtd,
+        extras: [
+          { label: 'Valor Estimado', value: fmtMoeda(v.estimado) },
+          { label: 'Valor Real', value: fmtMoeda(v.real) },
+        ],
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
 
   // Tabela detalhada
@@ -228,33 +257,14 @@ export default function DashboardDanilo() {
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
       </div>
 
-      {/* KPIs -- primeira linha: volume / segunda linha: valores em R$ */}
+      {/* KPIs */}
       <SectionTitle>Indicadores</SectionTitle>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <KPICard
           titulo="Contratos no Funil"
           valor={fmtInt(total)}
           legenda="Total no periodo selecionado"
         />
-        <KPICard
-          titulo="Parados (>15 dias)"
-          valor={fmtInt(parados)}
-          legenda="Sem atualizacao ha mais de 15 dias"
-          estilo="alert"
-        />
-        <KPICard
-          titulo="% Parados"
-          valor={fmtPct(pctParados)}
-          legenda="Percentual sobre total"
-          estilo="warning"
-        />
-        <KPICard
-          titulo="Tempo Medio Parado"
-          valor={`${tempoMedioParado} dias`}
-          legenda="Media de dias sem atualizacao"
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <KPICard
           titulo="Valor Estimado Total"
           valor={fmtMoeda(valorEstimadoTotal)}
@@ -268,13 +278,12 @@ export default function DashboardDanilo() {
         />
       </div>
 
-      {/* Graficos: etapa do funil (barras) + segmento e mercado (donuts) */}
+      {/* Graficos: 3 lado a lado (etapa / segmento / mercado) */}
       <SectionTitle>Distribuicao</SectionTitle>
-      <ChartCard title="Por Etapa do Funil" height={360} className="mb-4">
-        <HBarChart data={porStatus} color={COR_PRIMARIA} />
-      </ChartCard>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <ChartCard title="Por Etapa do Funil" height={360}>
+          <HBarChart data={porStatus} color={COR_PRIMARIA} />
+        </ChartCard>
         <ChartCard title="Contratos por Segmento" height={360}>
           <PieChart data={porSegmento} donut centerSubtitle="Contratos" legendToggleable />
         </ChartCard>

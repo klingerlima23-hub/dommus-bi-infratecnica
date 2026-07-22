@@ -13,8 +13,17 @@ import {
 import { Eye, EyeOff } from 'lucide-react';
 import { PALETA_GRAFICOS, COR_PRIMARIA } from '@/lib/paleta';
 
+/**
+ * Extras opcionais renderizados como linhas adicionais no tooltip do donut.
+ * Ex: [{ label: 'Valor Estimado', value: 'R$ 12.345,67' }]
+ */
+export interface PieExtra {
+  label: string;
+  value: string;
+}
+
 interface Props {
-  data: Array<{ key: string; value: number }>;
+  data: Array<{ key: string; value: number; extras?: PieExtra[] }>;
   colors?: string[];
   donut?: boolean;
   formatter?: (v: number) => string;
@@ -188,19 +197,33 @@ export default function Donut({
             )}
           </Pie>
           <Tooltip
-            formatter={(v: number) => (formatter ? formatter(v) : v.toLocaleString('pt-BR'))}
-            contentStyle={{
-              background: COR_PRIMARIA,
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 12,
+            content={(props: any) => {
+              const { active, payload } = props;
+              if (!active || !payload || payload.length === 0) return null;
+              const p = payload[0].payload as { key: string; value: number; extras?: PieExtra[] };
+              const valorTxt = formatter ? formatter(p.value) : p.value.toLocaleString('pt-BR');
+              return (
+                <div
+                  style={{
+                    background: COR_PRIMARIA,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: '8px 10px',
+                    minWidth: 140,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{p.key}</div>
+                  <div style={{ opacity: 0.9 }}>Qtd: <b>{valorTxt}</b></div>
+                  {p.extras?.map((e) => (
+                    <div key={e.label} style={{ opacity: 0.9, marginTop: 2 }}>
+                      {e.label}: <b>{e.value}</b>
+                    </div>
+                  ))}
+                </div>
+              );
             }}
-            // itemStyle: cor da linha do tooltip (NOME: valor). Sem isso,
-            // o Recharts herda a cor da fatia (azul escuro), ficando ilegivel
-            // sobre o fundo tambem azul escuro.
-            itemStyle={{ color: 'white' }}
-            labelStyle={{ color: 'white' }}
           />
           {legendVisible && <Legend wrapperStyle={{ fontSize: 11 }} verticalAlign="bottom" />}
         </PieChart>

@@ -6,10 +6,11 @@ import MultiSelectFilter from '@/components/filters/MultiSelectFilter';
 import KPICard from '@/components/kpi/KPICard';
 import ChartCard from '@/components/charts/ChartCard';
 import HBarChart from '@/components/charts/HBarChart';
+import PieChart from '@/components/charts/PieChart';
 import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
-import { fmtInt, fmtPct } from '@/lib/format';
+import { fmtInt, fmtMoeda, fmtPct } from '@/lib/format';
 import { COR_ALERTA, COR_PRIMARIA, COR_SECUNDARIA } from '@/lib/paleta';
 import { urlOportunidade } from '@/lib/urls';
 
@@ -50,6 +51,10 @@ interface Row {
   data_venda: string | null;
   data_venda_contabilizada: string | null;
   dias_sem_atualizacao: number | null;
+  valor_estimado: number | string | null;
+  valor_real: number | string | null;
+  tipo_mercado: string | null;
+  tipo_segmento: string | null;
   [key: string]: unknown;
 }
 
@@ -118,6 +123,14 @@ export default function DashboardDanilo() {
     [rows],
   );
 
+  // Helper: DECIMAL do MySQL vem como string via mysql2 (preserva
+  // precisao). Converte pra number, com fallback pra 0 se null/invalido.
+  const num = (v: number | string | null | undefined): number => {
+    if (v === null || v === undefined) return 0;
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    return Number.isFinite(n) ? n : 0;
+  };
+
   // KPIs
   const total = filtered.length;
   const parados = filtered.filter((r) => (r.dias_sem_atualizacao ?? 0) > DIAS_PARADO).length;
@@ -127,6 +140,8 @@ export default function DashboardDanilo() {
     diasComData.length > 0
       ? Math.round(diasComData.reduce((s, r) => s + (r.dias_sem_atualizacao ?? 0), 0) / diasComData.length)
       : 0;
+  const valorEstimadoTotal = filtered.reduce((s, r) => s + num(r.valor_estimado), 0);
+  const valorRealTotal = filtered.reduce((s, r) => s + num(r.valor_real), 0);
 
   // Distribuicao por status (etapa) -- ordenado por ordem_status quando existe
   const porStatus = useMemo(() => {
@@ -178,12 +193,40 @@ export default function DashboardDanilo() {
       .map(([key, value]) => ({ key, value }));
   }, [filtered]);
 
+  // Distribuicao por Tipo de Segmento (Agronegocio, Loteamento, etc)
+  const porSegmento = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of filtered) {
+      const k = r.tipo_segmento || 'Sem segmento';
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, value]) => ({ key, value }));
+  }, [filtered]);
+
+  // Distribuicao por Tipo de Mercado (Privado / Publico)
+  const porMercado = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of filtered) {
+      const k = r.tipo_mercado || 'Sem mercado';
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, value]) => ({ key, value }));
+  }, [filtered]);
+
   // Tabela detalhada
   const dataTabela = filtered.map((r) => ({
     id_oportunidade: r.id_oportunidade,
     lead_nome: r.lead_nome ?? '',
     nome_empreendimento: r.nome_empreendimento ?? '',
     status_oportunidade: r.status_oportunidade ?? '',
+    tipo_mercado: r.tipo_mercado ?? '',
+    tipo_segmento: r.tipo_segmento ?? '',
+    valor_estimado: num(r.valor_estimado),
+    valor_real: num(r.valor_real),
     nome_corretor: r.nome_corretor ?? '',
     nome_gerente: r.nome_gerente ?? '',
     data_cadastro: r.data_cadastro,
@@ -199,6 +242,10 @@ export default function DashboardDanilo() {
     { key: 'lead_nome', label: 'Lead', type: 'string' },
     { key: 'nome_empreendimento', label: 'Empreendimento', type: 'string' },
     { key: 'status_oportunidade', label: 'Status', type: 'string' },
+    { key: 'tipo_mercado', label: 'Mercado', type: 'string' },
+    { key: 'tipo_segmento', label: 'Segmento', type: 'string' },
+    { key: 'valor_estimado', label: 'Valor Estimado', type: 'money' },
+    { key: 'valor_real', label: 'Valor Real', type: 'money' },
     { key: 'nome_corretor', label: 'Corretor', type: 'string' },
     { key: 'nome_gerente', label: 'Gerente', type: 'string' },
     { key: 'data_cadastro', label: 'Data Cadastro', type: 'date' },
@@ -230,9 +277,9 @@ export default function DashboardDanilo() {
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
       </div>
 
-      {/* KPIs */}
+      {/* KPIs -- primeira linha: volume / segunda linha: valores em R$ */}
       <SectionTitle>Indicadores</SectionTitle>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <KPICard
           titulo="Contratos no Funil"
           valor={fmtInt(total)}
@@ -256,6 +303,19 @@ export default function DashboardDanilo() {
           legenda="Media de dias sem atualizacao"
         />
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <KPICard
+          titulo="Valor Estimado Total"
+          valor={fmtMoeda(valorEstimadoTotal)}
+          legenda="Soma dos valores estimados dos contratos filtrados"
+        />
+        <KPICard
+          titulo="Valor Real Total"
+          valor={fmtMoeda(valorRealTotal)}
+          legenda="Soma dos valores reais dos contratos filtrados"
+          estilo="success"
+        />
+      </div>
 
       {/* Graficos */}
       <SectionTitle>Distribuicao</SectionTitle>
@@ -274,6 +334,16 @@ export default function DashboardDanilo() {
         </ChartCard>
         <ChartCard title="Top 10 Empreendimentos" height={360}>
           <HBarChart data={porEmpreendimento} color={COR_SECUNDARIA} />
+        </ChartCard>
+      </div>
+
+      {/* Composicao por Segmento e Mercado (donuts) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Contratos por Segmento" height={360}>
+          <PieChart data={porSegmento} donut centerSubtitle="Contratos" legendToggleable />
+        </ChartCard>
+        <ChartCard title="Contratos por Tipo de Mercado" height={360}>
+          <PieChart data={porMercado} donut centerSubtitle="Contratos" legendToggleable />
         </ChartCard>
       </div>
 

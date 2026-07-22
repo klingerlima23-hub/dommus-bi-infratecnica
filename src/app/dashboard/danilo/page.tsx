@@ -83,9 +83,6 @@ export default function DashboardDanilo() {
   const [erro, setErro] = useState<string | null>(null);
 
   const [period, setPeriod] = useState(defaultDateRange());
-  const [empSel, setEmpSel] = useState<string[]>([]);
-  const [gerSel, setGerSel] = useState<string[]>([]);
-  const [corSel, setCorSel] = useState<string[]>([]);
   const [statusSel, setStatusSel] = useState<string[]>([]);
 
   useEffect(() => {
@@ -110,28 +107,12 @@ export default function DashboardDanilo() {
       if (!r.data_cadastro) return false;
       const d = new Date(r.data_cadastro);
       if (d < ini || d > fim) return false;
-      if (empSel.length && !empSel.includes(r.nome_empreendimento || '')) return false;
-      if (gerSel.length && !gerSel.includes(r.nome_gerente || '')) return false;
-      if (corSel.length && !corSel.includes(r.nome_corretor || '')) return false;
       if (statusSel.length && !statusSel.includes(r.status_oportunidade || '')) return false;
       return true;
     });
-  }, [rows, period, empSel, gerSel, corSel, statusSel]);
+  }, [rows, period, statusSel]);
 
-  // Opcoes dos filtros -- montadas do dataset completo (nao do filtrado),
-  // pra usuario ver todas as opcoes disponiveis sempre.
-  const empOptions = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.nome_empreendimento).filter((x): x is string => !!x))).sort(),
-    [rows],
-  );
-  const gerOptions = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.nome_gerente).filter((x): x is string => !!x))).sort(),
-    [rows],
-  );
-  const corOptions = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.nome_corretor).filter((x): x is string => !!x))).sort(),
-    [rows],
-  );
+  // Opcoes do filtro Status -- montadas do dataset completo.
   const statusOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.status_oportunidade).filter((x): x is string => !!x))).sort(),
     [rows],
@@ -246,9 +227,6 @@ export default function DashboardDanilo() {
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
-        <MultiSelectFilter label="Empreendimento" options={empOptions} selected={empSel} onChange={setEmpSel} />
-        <MultiSelectFilter label="Gerente" options={gerOptions} selected={gerSel} onChange={setGerSel} />
-        <MultiSelectFilter label="Corretor" options={corOptions} selected={corSel} onChange={setCorSel} />
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
       </div>
 

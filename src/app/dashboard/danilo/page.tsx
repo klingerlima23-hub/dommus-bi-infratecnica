@@ -137,21 +137,31 @@ export default function DashboardDanilo() {
     return map;
   }
 
-  // Distribuicao por status (etapa) -- ordenado por ordem_status quando existe.
-  // Extras no tooltip: valor estimado e real acumulados por etapa.
+  // Distribuicao por etapa do funil -- ordenacao SEMPRE pelo campo `ordem`
+  // de dw_infratecnica.d_etapa_oportunidade (chega no endpoint como
+  // `ordem_status` via `etp.ordem` no JOIN). Como o Recharts BarChart
+  // vertical renderiza o PRIMEIRO item do array na parte de BAIXO do
+  // grafico, invertemos o sort (b - a) pra que a etapa de MENOR ordem
+  // (inicio do funil) fique embaixo e a de MAIOR ordem (fechamento)
+  // fique em cima -- lendo de baixo pra cima segue o fluxo do funil.
   const porStatus = useMemo(() => {
     type Agg = { qtd: number; estimado: number; real: number; ordem: number };
     const map = new Map<string, Agg>();
     for (const r of filtered) {
       const k = r.status_oportunidade || 'Sem status';
-      const cur = map.get(k) || { qtd: 0, estimado: 0, real: 0, ordem: r.ordem_status ?? 999 };
+      // Converte explicitamente pra number (mysql2 as vezes devolve
+      // como string) e cai em Infinity se nao for finito, jogando
+      // etapas sem ordem pro fim.
+      const ordemNum = Number(r.ordem_status);
+      const ordem = Number.isFinite(ordemNum) ? ordemNum : Number.POSITIVE_INFINITY;
+      const cur = map.get(k) || { qtd: 0, estimado: 0, real: 0, ordem };
       cur.qtd += 1;
       cur.estimado += num(r.valor_estimado);
       cur.real += num(r.valor_real);
       map.set(k, cur);
     }
     return Array.from(map.entries())
-      .sort((a, b) => a[1].ordem - b[1].ordem)
+      .sort((a, b) => b[1].ordem - a[1].ordem)
       .map(([key, v]) => ({
         key,
         value: v.qtd,

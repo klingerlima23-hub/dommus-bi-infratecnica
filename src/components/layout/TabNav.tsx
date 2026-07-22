@@ -9,7 +9,7 @@ const TABS = [
   { href: '/dashboard/estoque', label: 'Estoque' },
   { href: '/dashboard/visitas', label: 'Visitas' },
   { href: '/dashboard/lead', label: 'Lead' },
-  { href: '/dashboard/danilo', label: 'Danilo' },
+  { href: '/dashboard/danilo', label: 'INFRAPRO' },
 ];
 
 export default function TabNav() {

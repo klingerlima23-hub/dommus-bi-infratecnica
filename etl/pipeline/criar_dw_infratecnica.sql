@@ -267,6 +267,7 @@ CREATE TABLE IF NOT EXISTS `f_venda` (
   `etapas_workflow_nome` VARCHAR(130) NULL COMMENT 'varchar(130)',
   `id_fase_etapa` BIGINT NULL COMMENT 'int',
   `id_fase` BIGINT NULL COMMENT 'int',
+  `id_evolucao` BIGINT NULL COMMENT 'evolucao_workflow.id (nullable)',
   `ordem_fase_etapa` BIGINT NULL COMMENT 'int',
   `equipe_nome` VARCHAR(255) NULL COMMENT 'varchar(255)',
   `proponente1_id` BIGINT NULL COMMENT 'int',
@@ -372,6 +373,26 @@ CREATE TABLE IF NOT EXISTS `f_oportunidade` (
   `id_campanha` BIGINT NULL,
   
   KEY `idx_f_oportunidade_id_oportunidade` (`id_oportunidade`)
+)
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------- f_oportunidade_interesse ----------
+-- Uma linha por oportunidade_interesse do funil 9 (INFRAPRO).
+-- Extrai chaves conhecidas do JSON dados_dinamicos e preserva o bruto.
+--   16 = valor_estimado / 17 = valor_real
+--   18 = tipo_mercado (Privado/Publico) / 19 = tipo_segmento
+CREATE TABLE IF NOT EXISTS `f_oportunidade_interesse` (
+  `id_oportunidade_interesse` BIGINT NULL COMMENT 'PK oportunidade_interesse.id (paginacao)',
+  `id_oportunidade`           BIGINT NULL COMMENT 'FK oportunidade (JOIN com f_oportunidade)',
+  `valor_estimado`            DECIMAL(20,2) NULL COMMENT 'dados_dinamicos.16',
+  `valor_real`                DECIMAL(20,2) NULL COMMENT 'dados_dinamicos.17',
+  `tipo_mercado`              VARCHAR(50) NULL  COMMENT 'dados_dinamicos.18 (Privado/Publico)',
+  `tipo_segmento`             VARCHAR(100) NULL COMMENT 'dados_dinamicos.19',
+  `dados_dinamicos_raw`       JSON NULL          COMMENT 'JSON bruto pra evolucoes futuras',
+  KEY `idx_f_oportunidade_interesse_id_oportunidade_interesse` (`id_oportunidade_interesse`),
+  KEY `idx_f_oportunidade_interesse_id_oportunidade`           (`id_oportunidade`),
+  KEY `idx_f_oportunidade_interesse_tipo_mercado`              (`tipo_mercado`),
+  KEY `idx_f_oportunidade_interesse_tipo_segmento`             (`tipo_segmento`)
 )
 ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -635,9 +656,13 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Origem: dommus_infratecnica.tb_etapas_workflow (self-join nivel/subnivel)
 -- Mapeia cada etapa do workflow para sua fase canonica do funil
 CREATE TABLE IF NOT EXISTS `d_fase_etapa` (
-  `id_fase_etapa`  BIGINT       NULL COMMENT 'tb_etapas_workflow.id (PK paginacao)',
-  `id_fase`        BIGINT       NULL COMMENT 'fase canonica (subnivel=0)',
-  `fase_da_etapa`  VARCHAR(255) NULL COMMENT 'nome da fase canonica',
+  `id_fase_etapa`   BIGINT       NULL COMMENT 'tb_etapas_workflow.id (PK paginacao)',
+  `id_fase`         BIGINT       NULL COMMENT 'fase canonica (subnivel=0)',
+  `subnivel_etapa`  BIGINT       NULL COMMENT 'ordem dentro da fase (0 = fase pai)',
+  `id_evolucao`     BIGINT       NULL COMMENT 'evolucao_workflow.id (se aplicavel)',
+  `nome_etapa`      VARCHAR(255) NULL COMMENT 'nome da etapa individual',
+  `fase_da_etapa`   VARCHAR(255) NULL COMMENT 'nome da fase canonica',
+  `categoria_funil` VARCHAR(255) NULL COMMENT 'categoria de agrupamento (Pastas, Contrato, Venda, ...)',
   KEY `idx_d_fase_etapa_id_fase_etapa` (`id_fase_etapa`),
   KEY `idx_d_fase_etapa_id_fase`       (`id_fase`)
 )

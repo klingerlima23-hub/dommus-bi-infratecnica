@@ -163,6 +163,7 @@ try:
     # Captacao / oportunidade
     _run("sincroniza_f_lead.py")
     _run("sincroniza_f_oportunidade.py")
+    _run("sincroniza_f_oportunidade_interesse.py")
     _run("sincroniza_f_atendimento_oportunidade.py")
     _run("sincroniza_f_visita.py")
     _run("sincroniza_f_descarte.py")

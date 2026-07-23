@@ -8,10 +8,11 @@ import KPICard from '@/components/kpi/KPICard';
 import ChartCard from '@/components/charts/ChartCard';
 import HBarChart from '@/components/charts/HBarChart';
 import PieChart from '@/components/charts/PieChart';
+import PeriodChart from '@/components/charts/PeriodChart';
 import SectionTitle from '@/components/layout/SectionTitle';
 import LoadingState from '@/components/layout/LoadingState';
 import DataTable, { type Column } from '@/components/tables/DataTable';
-import { fmtInt, fmtMoeda } from '@/lib/format';
+import { fmtInt, fmtMoeda, bucketDate } from '@/lib/format';
 import { COR_PRIMARIA } from '@/lib/paleta';
 import { urlOportunidade } from '@/lib/urls';
 
@@ -81,6 +82,11 @@ export default function DashboardDanilo() {
   const METRICAS = ['Prospeccao', 'Contratos'] as const;
   type Metrica = (typeof METRICAS)[number];
   const [metrica, setMetrica] = useState<Metrica>('Prospeccao');
+
+  // Granularidade da serie temporal (grafico "por periodo")
+  const GRANS = ['Mes', 'Trimestre', 'Ano'] as const;
+  type Gran = (typeof GRANS)[number];
+  const [gran, setGran] = useState<Gran>('Mes');
 
   useEffect(() => {
     let alive = true;
@@ -182,6 +188,36 @@ export default function DashboardDanilo() {
       }));
   }, [filtered]);
 
+  // Serie temporal bucketizada pela granularidade selecionada.
+  // Usa o mesmo campo de data que a metrica (data_cadastro pra
+  // Prospeccao, data_venda pra Contratos). Ordena cronologicamente
+  // usando uma chave sortable (YYYY / YYYY-MM / YYYY-Tn) e SO exibe
+  // o label legivel (Jan/2026, T2/2026, 2026) no eixo X.
+  const porPeriodo = useMemo(() => {
+    type Agg = { sortKey: string; label: string; qtd: number; vgv: number };
+    const map = new Map<string, Agg>();
+    for (const r of filtered) {
+      const dataRef = metrica === 'Contratos' ? r.data_venda : r.data_cadastro;
+      if (!dataRef) continue;
+      const d = new Date(dataRef);
+      const label = bucketDate(d, gran);
+      // Chave sortable independente do label (evita "Abr" < "Fev" alfabetico)
+      let sortKey: string;
+      const y = d.getFullYear();
+      if (gran === 'Ano') sortKey = String(y);
+      else if (gran === 'Trimestre') sortKey = `${y}-T${Math.ceil((d.getMonth() + 1) / 3)}`;
+      else sortKey = `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+      const cur = map.get(label) || { sortKey, label, qtd: 0, vgv: 0 };
+      cur.qtd += 1;
+      cur.vgv += num(r.valor_estimado);
+      map.set(label, cur);
+    }
+    return Array.from(map.values())
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ label, qtd, vgv }) => ({ periodo: label, qtd, vgv }));
+  }, [filtered, gran, metrica]);
+
   // Distribuicao por Tipo de Segmento (Agronegocio, Loteamento, etc)
   const porSegmento = useMemo(() => {
     const map = agruparComExtras((r) => r.tipo_segmento || 'Sem segmento');
@@ -266,7 +302,13 @@ export default function DashboardDanilo() {
 
   return (
     <div>
-      {/* Filtros */}
+      {/* Metrica: fora do container de filtros (bloco proprio, sem
+          fundo/borda -- so a pill do RadioGroup, alinhada a esquerda) */}
+      <div className="mb-4">
+        <RadioGroup label="Metrica" options={METRICAS} value={metrica} onChange={setMetrica} />
+      </div>
+
+      {/* Filtros -- dependem da metrica selecionada acima */}
       <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
           label={`Periodo (${metrica === 'Contratos' ? 'data venda' : 'data cadastro'})`}
@@ -274,7 +316,7 @@ export default function DashboardDanilo() {
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
-        <RadioGroup label="Metrica" options={METRICAS} value={metrica} onChange={setMetrica} />
+        <RadioGroup label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
       </div>
 
@@ -298,6 +340,16 @@ export default function DashboardDanilo() {
           estilo="success"
         />
       </div>
+
+      {/* Serie temporal -- bucketizada pela granularidade selecionada */}
+      <SectionTitle>Evolucao ({gran})</SectionTitle>
+      <ChartCard
+        title={`${metrica === 'Contratos' ? 'Contratos' : 'Prospeccoes'} por ${gran}`}
+        height={340}
+        className="mb-4"
+      >
+        <PeriodChart data={porPeriodo} showVgv />
+      </ChartCard>
 
       {/* Graficos: 3 lado a lado (etapa / segmento / mercado) */}
       <SectionTitle>Distribuicao</SectionTitle>

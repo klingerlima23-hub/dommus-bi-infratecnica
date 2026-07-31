@@ -76,10 +76,11 @@ export default function DashboardDanilo() {
 
   const [period, setPeriod] = useState(defaultDateRange());
   const [statusSel, setStatusSel] = useState<string[]>([]);
+  const [segmentoSel, setSegmentoSel] = useState<string[]>([]);
   // Metrica: define qual campo de data o filtro de periodo usa.
-  //   'Prospeccao' -> data_cadastro (quando a oportunidade foi criada)
-  //   'Contratos'  -> data_venda    (quando virou venda efetiva)
-  const METRICAS = ['Prospeccao', 'Contratos'] as const;
+  //   'Prospeccao'    -> data_cadastro (quando a oportunidade foi criada)
+  //   'Oportunidades' -> data_venda    (quando virou venda efetiva)
+  const METRICAS = ['Prospeccao', 'Oportunidades'] as const;
   type Metrica = (typeof METRICAS)[number];
   const [metrica, setMetrica] = useState<Metrica>('Prospeccao');
 
@@ -110,18 +111,24 @@ export default function DashboardDanilo() {
       // Escolhe o campo de data conforme a metrica selecionada.
       // Contratos: exige data_venda populada (senao a linha nao virou
       // contrato ainda e nao entra na contagem).
-      const dataRef = metrica === 'Contratos' ? r.data_venda : r.data_cadastro;
+      const dataRef = metrica === 'Oportunidades' ? r.data_venda : r.data_cadastro;
       if (!dataRef) return false;
       const d = new Date(dataRef);
       if (d < ini || d > fim) return false;
       if (statusSel.length && !statusSel.includes(r.status_oportunidade || '')) return false;
+      if (segmentoSel.length && !segmentoSel.includes(r.tipo_segmento || '')) return false;
       return true;
     });
-  }, [rows, period, metrica, statusSel]);
+  }, [rows, period, metrica, statusSel, segmentoSel]);
 
-  // Opcoes do filtro Status -- montadas do dataset completo.
+  // Opcoes dos filtros -- montadas do dataset completo (sem filtro
+  // aplicado), pra o usuario sempre ver todas as opcoes disponiveis.
   const statusOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.status_oportunidade).filter((x): x is string => !!x))).sort(),
+    [rows],
+  );
+  const segmentoOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.tipo_segmento).filter((x): x is string => !!x))).sort(),
     [rows],
   );
 
@@ -197,7 +204,7 @@ export default function DashboardDanilo() {
     type Agg = { sortKey: string; label: string; qtd: number; vgv: number };
     const map = new Map<string, Agg>();
     for (const r of filtered) {
-      const dataRef = metrica === 'Contratos' ? r.data_venda : r.data_cadastro;
+      const dataRef = metrica === 'Oportunidades' ? r.data_venda : r.data_cadastro;
       if (!dataRef) continue;
       const d = new Date(dataRef);
       const label = bucketDate(d, gran);
@@ -290,7 +297,7 @@ export default function DashboardDanilo() {
     { key: 'nome_campanha', label: 'Campanha', type: 'string', uppercase: true },
   ];
 
-  if (loading) return <LoadingState message="Carregando contratos do funil comercial..." />;
+  if (loading) return <LoadingState message="Carregando oportunidades do funil comercial..." />;
 
   if (erro) {
     return (
@@ -311,32 +318,33 @@ export default function DashboardDanilo() {
       {/* Filtros -- dependem da metrica selecionada acima */}
       <div className="flex flex-wrap gap-3 items-end mb-6 bg-[#F7F9FC] border border-[#E5E9F0] rounded-md p-4">
         <DateRangeFilter
-          label={`Periodo (${metrica === 'Contratos' ? 'data venda' : 'data cadastro'})`}
+          label={`Periodo (${metrica === 'Oportunidades' ? 'data venda' : 'data cadastro'})`}
           start={period.start}
           end={period.end}
           onChange={(s, e) => setPeriod({ start: s, end: e })}
         />
         <RadioGroup label="Granularidade" options={GRANS} value={gran} onChange={setGran} />
         <MultiSelectFilter label="Status" options={statusOptions} selected={statusSel} onChange={setStatusSel} />
+        <MultiSelectFilter label="Segmento" options={segmentoOptions} selected={segmentoSel} onChange={setSegmentoSel} />
       </div>
 
       {/* KPIs */}
       <SectionTitle>Indicadores</SectionTitle>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <KPICard
-          titulo="Contratos no Funil"
+          titulo="Oportunidades no Funil"
           valor={fmtInt(total)}
           legenda="Total no periodo selecionado"
         />
         <KPICard
           titulo="Valor Estimado Total"
           valor={fmtMoeda(valorEstimadoTotal)}
-          legenda="Soma dos valores estimados dos contratos filtrados"
+          legenda="Soma dos valores estimados das oportunidades filtradas"
         />
         <KPICard
           titulo="Valor Real Total"
           valor={fmtMoeda(valorRealTotal)}
-          legenda="Soma dos valores reais dos contratos filtrados"
+          legenda="Soma dos valores reais das oportunidades filtradas"
           estilo="success"
         />
       </div>
@@ -344,7 +352,7 @@ export default function DashboardDanilo() {
       {/* Serie temporal -- bucketizada pela granularidade selecionada */}
       <SectionTitle>Evolucao ({gran})</SectionTitle>
       <ChartCard
-        title={`${metrica === 'Contratos' ? 'Contratos' : 'Prospeccoes'} por ${gran}`}
+        title={`${metrica === 'Oportunidades' ? 'Oportunidades' : 'Prospeccoes'} por ${gran}`}
         height={340}
         className="mb-4"
       >
@@ -357,20 +365,20 @@ export default function DashboardDanilo() {
         <ChartCard title="Por Etapa do Funil" height={360}>
           <HBarChart data={porStatus} color={COR_PRIMARIA} />
         </ChartCard>
-        <ChartCard title="Contratos por Segmento" height={360}>
-          <PieChart data={porSegmento} donut centerSubtitle="Contratos" legendToggleable />
+        <ChartCard title="Oportunidades por Segmento" height={360}>
+          <PieChart data={porSegmento} donut centerSubtitle="Oportunidades" legendToggleable />
         </ChartCard>
-        <ChartCard title="Contratos por Tipo de Mercado" height={360}>
-          <PieChart data={porMercado} donut centerSubtitle="Contratos" legendToggleable />
+        <ChartCard title="Oportunidades por Tipo de Mercado" height={360}>
+          <PieChart data={porMercado} donut centerSubtitle="Oportunidades" legendToggleable />
         </ChartCard>
       </div>
 
       {/* Tabela detalhada */}
-      <SectionTitle>Detalhe dos Contratos</SectionTitle>
+      <SectionTitle>Detalhe das Oportunidades</SectionTitle>
       <DataTable
         rows={dataTabela}
         columns={columns}
-        filename="danilo-contratos.csv"
+        filename="danilo-oportunidades.csv"
         rowLink={(r) => urlOportunidade(r.id_oportunidade)}
       />
     </div>

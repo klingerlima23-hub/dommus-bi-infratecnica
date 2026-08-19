@@ -145,6 +145,12 @@ export default function DashboardDanilo() {
   const valorEstimadoTotal = filtered.reduce((s, r) => s + num(r.valor_estimado), 0);
   const valorRealTotal = filtered.reduce((s, r) => s + num(r.valor_real), 0);
 
+  // Valores restritos a oportunidades cuja etapa atual seja "Contrato"
+  // (final do funil, antes de virar venda contabilizada).
+  const oportunidadesContrato = filtered.filter((r) => r.status_oportunidade === 'Contrato');
+  const valorEstimadoContrato = oportunidadesContrato.reduce((s, r) => s + num(r.valor_estimado), 0);
+  const valorRealContrato = oportunidadesContrato.reduce((s, r) => s + num(r.valor_real), 0);
+
   // Helper: agrupa `filtered` por uma chave (funcao) e devolve entries
   // com qtd + soma de valor_estimado / valor_real (para o tooltip).
   function agruparComExtras(keyFn: (r: Row) => string) {
@@ -330,7 +336,7 @@ export default function DashboardDanilo() {
 
       {/* KPIs */}
       <SectionTitle>Indicadores</SectionTitle>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           titulo="Oportunidades no Funil"
           valor={fmtInt(total)}
@@ -345,6 +351,12 @@ export default function DashboardDanilo() {
           titulo="Valor Real Total"
           valor={fmtMoeda(valorRealTotal)}
           legenda="Soma dos valores reais das oportunidades filtradas"
+          estilo="success"
+        />
+        <KPICard
+          titulo="Valor de Contrato"
+          valor={fmtMoeda(valorRealContrato)}
+          legenda={`${fmtMoeda(valorEstimadoContrato)} (vlr. estimado)`}
           estilo="success"
         />
       </div>

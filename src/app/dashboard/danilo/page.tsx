@@ -354,7 +354,7 @@ export default function DashboardDanilo() {
           legenda="Soma dos valores reais das oportunidades filtradas"
         />
         <KPICard
-          titulo="Valor de Contrato"
+          titulo={`Valor de Contrato (${oportunidadesContrato.length})`}
           valor={fmtMoeda(valorRealContrato)}
           legenda={`${fmtMoeda(valorEstimadoContrato)} (vlr. estimado)`}
           estilo="success"

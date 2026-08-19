@@ -346,12 +346,12 @@ export default function DashboardDanilo() {
           titulo="Valor Estimado Total"
           valor={fmtMoeda(valorEstimadoTotal)}
           legenda="Soma dos valores estimados das oportunidades filtradas"
+          estilo="warning"
         />
         <KPICard
           titulo="Valor Real Total"
           valor={fmtMoeda(valorRealTotal)}
           legenda="Soma dos valores reais das oportunidades filtradas"
-          estilo="success"
         />
         <KPICard
           titulo="Valor de Contrato"

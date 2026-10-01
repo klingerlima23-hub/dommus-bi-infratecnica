@@ -147,14 +147,38 @@ export default function LeadVisaoGeral() {
   const pctVisRealiz = opvsUnicasComVisita ? (visitasRealizadas / opvsUnicasComVisita) * 100 : 0;
 
   // Gráficos
+  // sortKey auxiliar pra ordem cronologica (bucketDate devolve "Mai/2026",
+  // que ordena alfabeticamente errado -- Abr antes de Fev antes de Jun).
   const perPeriodo = useMemo(() => {
-    const m = new Map<string, number>();
+    type Agg = { sortKey: string; periodo: string; qtd: number };
+    const m = new Map<string, Agg>();
     for (const r of filtrado) {
       if (!r.data_distribuicao) continue;
-      const k = bucketDate(new Date(r.data_distribuicao), gran);
-      m.set(k, (m.get(k) ?? 0) + 1);
+      const d = new Date(r.data_distribuicao);
+      const periodo = bucketDate(d, gran);
+      const y = d.getFullYear();
+      const mo = d.getMonth() + 1;
+      let sortKey: string;
+      if (gran === 'Ano') sortKey = String(y);
+      else if (gran === 'Trimestre') sortKey = `${y}-T${Math.ceil(mo / 3)}`;
+      else if (gran === 'Semana') {
+        const tmp = new Date(d);
+        tmp.setHours(0, 0, 0, 0);
+        tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+        const yearStart = new Date(tmp.getFullYear(), 0, 1);
+        const wk = Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+        sortKey = `${tmp.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+      }
+      else if (gran === 'Dia') sortKey = `${y}-${String(mo).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      else sortKey = `${y}-${String(mo).padStart(2, '0')}`;
+
+      const cur = m.get(periodo) ?? { sortKey, periodo, qtd: 0 };
+      cur.qtd += 1;
+      m.set(periodo, cur);
     }
-    return Array.from(m.entries()).map(([periodo, qtd]) => ({ periodo, qtd }));
+    return Array.from(m.values())
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ periodo, qtd }) => ({ periodo, qtd }));
   }, [filtrado, gran]);
 
   const porStatus = useMemo(() => {

@@ -248,22 +248,47 @@ export default function VendasVisaoAtual() {
   }
 
   // por período (com VGV se métrica tiver) — usa a data propria da metrica
-  // (cadastro pra Cadastros/Pastas/Reprovados; contabilizacao pra Venda)
+  // (cadastro pra Cadastros/Pastas/Reprovados; contabilizacao pra Venda).
+  //
+  // Ordem cronologica: `bucketDate` devolve label legivel (ex "Mai/2026"),
+  // que ordena alfabeticamente errado (Abr antes de Fev antes de Jun).
+  // Guardamos sortKey auxiliar (YYYY / YYYY-Tn / YYYY-Www / YYYY-MM /
+  // YYYY-MM-DD) e so' expomos o `periodo` legivel no eixo X.
   const perPeriodo = useMemo(() => {
     const vgv = vgvCol(metrica);
     const df = dateFieldFor(metrica);
-    const map = new Map<string, { qtd: number; vgv: number }>();
+    type Agg = { sortKey: string; periodo: string; qtd: number; vgv: number };
+    const map = new Map<string, Agg>();
     for (const r of dfMetrica) {
       const v = r[df];
       if (!v) continue;
       const d = new Date(v as string);
-      const k = bucketDate(d, gran);
-      const cur = map.get(k) ?? { qtd: 0, vgv: 0 };
+      const periodo = bucketDate(d, gran);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      let sortKey: string;
+      if (gran === 'Ano') sortKey = String(y);
+      else if (gran === 'Trimestre') sortKey = `${y}-T${Math.ceil(m / 3)}`;
+      else if (gran === 'Semana') {
+        // ISO-week sortkey (yyyy-Www) -- mesma logica do bucketDate
+        const tmp = new Date(d);
+        tmp.setHours(0, 0, 0, 0);
+        tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+        const yearStart = new Date(tmp.getFullYear(), 0, 1);
+        const wk = Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+        sortKey = `${tmp.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+      }
+      else if (gran === 'Dia') sortKey = `${y}-${String(m).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      else sortKey = `${y}-${String(m).padStart(2, '0')}`; // Mes
+
+      const cur = map.get(periodo) ?? { sortKey, periodo, qtd: 0, vgv: 0 };
       cur.qtd += 1;
       if (vgv) cur.vgv += Number(r[vgv]) || 0;
-      map.set(k, cur);
+      map.set(periodo, cur);
     }
-    return Array.from(map.entries()).map(([periodo, v]) => ({ periodo, qtd: v.qtd, vgv: v.vgv }));
+    return Array.from(map.values())
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ periodo, qtd, vgv }) => ({ periodo, qtd, vgv }));
   }, [dfMetrica, gran, metrica]);
 
   // tabela

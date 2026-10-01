@@ -101,21 +101,43 @@ export default function VisitasPage() {
   const hbarEmp = useMemo(() => groupByCount(filtrado, 'nome_empreendimento', 15), [filtrado]);
   const hbarLocal = useMemo(() => groupByCount(filtrado, 'local_visita', 15), [filtrado]);
 
-  // Cadastradas x Realizadas por período
+  // Cadastradas x Realizadas por período.
+  // sortKey auxiliar (YYYY-MM / YYYY-Tn / YYYY) garante ordem cronologica
+  // -- o label `bucketDate` (ex "Mai/2026") ordena alfabeticamente errado.
   const perPeriodo = useMemo(() => {
-    const map = new Map<string, { cad: number; real: number }>();
+    type Agg = { sortKey: string; periodo: string; cad: number; real: number };
+    const map = new Map<string, Agg>();
     for (const r of filtrado) {
       if (!r.data_visita) continue;
-      const k = bucketDate(new Date(r.data_visita), gran);
-      const cur = map.get(k) ?? { cad: 0, real: 0 };
+      const d = new Date(r.data_visita);
+      const periodo = bucketDate(d, gran);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      let sortKey: string;
+      if (gran === 'Ano') sortKey = String(y);
+      else if (gran === 'Trimestre') sortKey = `${y}-T${Math.ceil(m / 3)}`;
+      else if (gran === 'Semana') {
+        const tmp = new Date(d);
+        tmp.setHours(0, 0, 0, 0);
+        tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+        const yearStart = new Date(tmp.getFullYear(), 0, 1);
+        const wk = Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+        sortKey = `${tmp.getFullYear()}-W${String(wk).padStart(2, '0')}`;
+      }
+      else if (gran === 'Dia') sortKey = `${y}-${String(m).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      else sortKey = `${y}-${String(m).padStart(2, '0')}`;
+
+      const cur = map.get(periodo) ?? { sortKey, periodo, cad: 0, real: 0 };
       cur.cad += 1;
       if ((r.visita_realizada || '').toLowerCase() === 'sim') cur.real += 1;
-      map.set(k, cur);
+      map.set(periodo, cur);
     }
-    return Array.from(map.entries()).map(([periodo, v]) => ({
-      periodo,
-      qtd: metricaChart === 'Visitas Realizadas' ? v.real : v.cad,
-    }));
+    return Array.from(map.values())
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ periodo, cad, real }) => ({
+        periodo,
+        qtd: metricaChart === 'Visitas Realizadas' ? real : cad,
+      }));
   }, [filtrado, gran, metricaChart]);
 
   const colunas: Column<Row>[] = [

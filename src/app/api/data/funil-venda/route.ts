@@ -27,7 +27,8 @@ export const revalidate = 0;
 const SQL = `
 SELECT
   v.processo_id                       AS id_processo,
-  v.processo_cadastrado_em,
+  -- Camada 2 do fix de timezone: DATE_FORMAT ISO SEM Z (vide guia).
+  DATE_FORMAT(v.processo_cadastrado_em, '%Y-%m-%dT%H:%i:%s') AS processo_cadastrado_em,
   v.empreendimento_nome,
   v.equipe_nome,
   v.gerente_nome,
@@ -37,9 +38,9 @@ SELECT
   v.lead_midia,
   v.analise_credito_financiamento,
   v.unidade_valor_liquido,
-  v.processo_data_venda,
+  DATE_FORMAT(v.processo_data_venda,    '%Y-%m-%dT%H:%i:%s') AS processo_data_venda,
   v.processo_unidade_id,
-  v.venda_contabilizado_em,
+  DATE_FORMAT(v.venda_contabilizado_em, '%Y-%m-%dT%H:%i:%s') AS venda_contabilizado_em,
   v.etapas_workflow_nome              AS etapa_atual,
   CASE WHEN v.processo_unidade_id > 0 AND v.processo_data_venda IS NOT NULL THEN 1 ELSE 0 END AS is_venda,
   CASE WHEN EXISTS (

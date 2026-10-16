@@ -33,9 +33,11 @@ SELECT
   v.equipe_nome,
   v.empreendimento_nome,
   v.unidade_descricao,
-  v.processo_cadastrado_em,
-  v.processo_data_venda,
-  v.venda_contabilizado_em,
+  -- Camada 2 do fix de timezone: DATE_FORMAT devolve string ISO SEM Z
+  -- pra o JS interpretar como horario local (vide guia).
+  DATE_FORMAT(v.processo_cadastrado_em, '%Y-%m-%dT%H:%i:%s') AS processo_cadastrado_em,
+  DATE_FORMAT(v.processo_data_venda,    '%Y-%m-%dT%H:%i:%s') AS processo_data_venda,
+  DATE_FORMAT(v.venda_contabilizado_em, '%Y-%m-%dT%H:%i:%s') AS venda_contabilizado_em,
   v.etapas_workflow_nome                           AS etapa_atual,
   v.lead_origem,
   v.lead_campanha,

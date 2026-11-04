@@ -6,4 +6,6 @@ select
 	o.atualizado_em as 'data_atualizacao', -- datetime
 	if(o.ativo='0','NÃO','SIM') as 'ativo'
 from crm_inquilino_0040.origem as o
-where o.atualizado_em between '{data_inicio}' and '{data_fim}'
+-- Full load: filtro `atualizado_em BETWEEN` removido pelo mesmo motivo
+-- de d_midia (NULL BETWEEN x AND y => NULL, excluindo origens nunca
+-- atualizadas e quebrando JOIN em fatos que referenciam id_origem).

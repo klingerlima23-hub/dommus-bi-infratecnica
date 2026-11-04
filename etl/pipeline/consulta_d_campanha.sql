@@ -6,4 +6,6 @@ select
 	c.atualizado_em as 'data_atualizacao',
 	c.ativo as 'ativo'
 from crm_inquilino_0040.campanha as c
-where c.atualizado_em between '{data_inicio}' and '{data_fim}'
+-- Full load: filtro `atualizado_em BETWEEN` removido pelo mesmo motivo
+-- de d_midia (NULL BETWEEN x AND y => NULL, excluindo campanhas nunca
+-- atualizadas e quebrando JOIN em fatos que referenciam id_campanha).

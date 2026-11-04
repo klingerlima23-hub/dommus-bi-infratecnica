@@ -33,9 +33,20 @@ SELECT * FROM (
                 v.data_visita DESC
         ) AS rn
     FROM f_visita v
-    LEFT JOIN d_corretor criador     ON v.id_criador_visita     = criador.id_corretor
-    LEFT JOIN d_corretor responsavel ON v.id_responsavel_visita = responsavel.id_corretor
-    LEFT JOIN d_corretor concluiu    ON v.id_concluiu_visita    = concluiu.id_corretor
+    -- Dedupe de d_corretor nos 3 JOINs. Corretor em N equipes duplica
+    -- linhas -- em serie, a multiplicacao vira cubica (ate N^3 vezes).
+    LEFT JOIN (
+      SELECT id_corretor, MAX(nome_corretor) AS nome_corretor
+      FROM d_corretor WHERE id_corretor IS NOT NULL GROUP BY id_corretor
+    ) criador     ON v.id_criador_visita     = criador.id_corretor
+    LEFT JOIN (
+      SELECT id_corretor, MAX(nome_corretor) AS nome_corretor
+      FROM d_corretor WHERE id_corretor IS NOT NULL GROUP BY id_corretor
+    ) responsavel ON v.id_responsavel_visita = responsavel.id_corretor
+    LEFT JOIN (
+      SELECT id_corretor, MAX(nome_corretor) AS nome_corretor
+      FROM d_corretor WHERE id_corretor IS NOT NULL GROUP BY id_corretor
+    ) concluiu    ON v.id_concluiu_visita    = concluiu.id_corretor
     LEFT JOIN d_empreendimento e     ON v.id_empreendimento     = e.id_empreendimento
 ) t
 WHERE rn = 1

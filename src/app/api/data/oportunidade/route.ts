@@ -31,7 +31,17 @@ SELECT
 FROM f_oportunidade AS o
 LEFT JOIN d_empreendimento e ON o.id_empreendimento = e.id_empreendimento
 LEFT JOIN d_gerente g ON o.id_gerente = g.id_gerente
-LEFT JOIN d_corretor c ON o.id_corretor = c.id_corretor
+-- Subquery deduplicada em d_corretor pra evitar multiplicar linhas de
+-- f_oportunidade: d_corretor tem GROUP BY id_corretor, eq.id, ou seja,
+-- um corretor em N equipes aparece N vezes. Sem dedupe, cada OPV virava
+-- N linhas no resultado (26 OPVs reais viravam 38 contagem no KPI).
+-- Mesma estrategia do endpoint /api/data/ranking-vendas.
+LEFT JOIN (
+  SELECT id_corretor, MAX(nome_corretor) AS nome_corretor
+  FROM d_corretor
+  WHERE id_corretor IS NOT NULL
+  GROUP BY id_corretor
+) c ON o.id_corretor = c.id_corretor
 LEFT JOIN d_etapa_oportunidade etp ON o.id_status_oportunidade = etp.id_status_oportunidade
 LEFT JOIN d_campanha cmp ON o.id_campanha = cmp.id_campanha
 ORDER BY o.id_oportunidade

@@ -35,7 +35,14 @@ LEFT JOIN d_midia          m   ON f.id_midia          = m.id_midia
 LEFT JOIN d_origem         org ON f.id_origem         = org.id_origem
 LEFT JOIN d_campanha       cmp ON f.id_campanha       = cmp.id_campanha
 LEFT JOIN d_empreendimento e   ON f.id_empreendimento = e.id_empreendimento
-LEFT JOIN d_corretor       c   ON f.id_corretor       = c.id_corretor
+-- Dedupe de d_corretor (corretor em N equipes = N linhas). Sem isso,
+-- cada linha de f_funil era multiplicada, inflando os KPIs.
+LEFT JOIN (
+  SELECT id_corretor, MAX(nome_corretor) AS nome_corretor
+  FROM d_corretor
+  WHERE id_corretor IS NOT NULL
+  GROUP BY id_corretor
+) c ON f.id_corretor = c.id_corretor
 LEFT JOIN d_gerente        g   ON f.id_gerente_pdv    = g.id_gerente
 LEFT JOIN d_equipe         eq  ON f.id_equipe_pdv     = eq.id_equipe
 `;

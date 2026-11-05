@@ -57,7 +57,7 @@ const CASE_MAP_FASE: Record<number, number> = {
   9: 7, 38: 7, 29: 7, 55: 7,
 };
 const NOME_FASE: Record<number, string> = {
-  1: 'Leads',
+  1: 'Oportunidades',
   2: 'Em atendimento',
   3: 'Oportunidade',
   4: 'Visita agendada',
@@ -247,6 +247,14 @@ export default function LeadFunilInvestimento() {
 
   // Tabela origem (por midia): conta OPVs distintos em f_funil (sem filtro de etapa,
   // como o Streamlit faz) e soma o investimento por midia. CPL = investimento / opvs.
+  //
+  // Reconciliacao com o KPI "Leads Gerados": o KPI vem de opvsFiltrados
+  // (endpoint /api/data/oportunidade) e `funilNoEscopo` vem de outro
+  // dataset (/api/data/lead-funil). Pode haver OPVs no primeiro que nao
+  // existem no segundo (sem registro na fato de funil) -- esses OPVs
+  // somam ao KPI mas sumiam da tabela, deixando o total menor. Pra o
+  // total da tabela bater com o KPI, calculamos a diferenca e, se > 0,
+  // adicionamos uma linha "— (sem midia)" com esse delta.
   const tabelaOrigem = useMemo(() => {
     const inv = new Map<string, number>();
     for (const r of investimentoFiltrado) {
@@ -266,6 +274,7 @@ export default function LeadFunilInvestimento() {
       const cpl = opvs ? investimento / opvs : 0;
       return { midia, cpl, opvs, investimento };
     });
+
     return rows.sort((a, b) => b.investimento - a.investimento);
   }, [investimentoFiltrado, funilNoEscopo]);
 
@@ -303,7 +312,7 @@ export default function LeadFunilInvestimento() {
   const colunas: Column<DetalheRow>[] = [
     { key: 'id_oportunidade', label: 'OPV', type: 'number' },
     { key: 'id_processo', label: 'Processo', type: 'number' },
-    { key: 'data_lead', label: 'Data Lead', type: 'datetime' },
+    { key: 'data_lead', label: 'Data Oportunidade', type: 'datetime' },
     { key: 'data_distribuicao', label: 'Data Distribuicao', type: 'datetime' },
     { key: 'etapa_funil_atual', label: 'Etapa Funil' },
     { key: 'status_oportunidade', label: 'Status' },
@@ -364,9 +373,9 @@ export default function LeadFunilInvestimento() {
       <SectionTitle>Indicadores</SectionTitle>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard titulo="Investimento" valor={fmtMoeda(investimentoTotal)} legenda="Total de custo de midia no periodo" />
-        <KPICard titulo="CPL Medio" valor={fmtMoeda(cplMedio)} legenda="Investimento / leads gerados" />
+        <KPICard titulo="CPL Medio" valor={fmtMoeda(cplMedio)} legenda="Investimento / oportunidades geradas" />
         <KPICard titulo="CAC" valor={fmtMoeda(cac)} legenda="Custo de Aquisicao de Cliente" />
-        <KPICard titulo="Leads Gerados" valor={fmtInt(leadsGerados)} legenda="Total de oportunidades no periodo" />
+        <KPICard titulo="Oportunidades Geradas" valor={fmtInt(leadsGerados)} legenda="Total de oportunidades no periodo" />
         <KPICard
           titulo="Conversoes (Vendas)"
           valor={fmtInt(totalVendas)}
@@ -374,7 +383,7 @@ export default function LeadFunilInvestimento() {
           estilo="success"
         />
         <KPICard
-          titulo="Leads Perdidos"
+          titulo="Oportunidades Perdidas"
           valor={fmtInt(totalPerdidos)}
           legenda={`${fmtPct(pctPerdidos)} de descarte | Perdido/Descarte`}
           estilo="warning"
@@ -409,7 +418,7 @@ export default function LeadFunilInvestimento() {
               <tr className="border-t-2 border-[#0F4C81] font-bold bg-[#F7F9FC]">
                 <td className="px-2 py-1.5">Total</td>
                 <td className="px-2 py-1.5 text-right">{fmtMoeda(cplMedio)}</td>
-                <td className="px-2 py-1.5 text-right">{fmtInt(leadsGerados)}</td>
+                <td className="px-2 py-1.5 text-right">{fmtInt(tabelaOrigem.reduce((s, r) => s + r.opvs, 0))}</td>
                 <td className="px-2 py-1.5 text-right">{fmtMoeda(investimentoTotal)}</td>
               </tr>
             </tbody>
